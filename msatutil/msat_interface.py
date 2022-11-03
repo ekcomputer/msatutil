@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import sys
+import glob
 import numpy as np
 import pandas as pd
 import netCDF4 as ncdf
@@ -120,6 +121,12 @@ def vcd_o4(p0, t0, rh0):
 
     return r
 
+def get_msat(indir,srchstr="Methane*.nc"):
+    """
+    Function to get the L1B or L2 files under indir into a msat_collection object
+    """
+    flist = glob.glob(os.path.join(indir,srchstr))
+    return msat_collection(flist,use_dask=True)
 
 class msat_file(msat_nc):
     """
