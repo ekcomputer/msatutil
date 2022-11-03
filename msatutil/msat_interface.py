@@ -10,7 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import argparse
-from msat_nc import MSATError, msat_nc
+from msatutil.msat_nc import MSATError, msat_nc
 from collections import OrderedDict
 from typing import Optional, Sequence, Tuple, Union, Annotated, List, Generator
 import dask

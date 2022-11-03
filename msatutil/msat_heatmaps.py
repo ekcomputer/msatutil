@@ -1,4 +1,4 @@
-from msat_interface import *
+from msatutil.msat_interface import *
 
 
 def msat_heatmap(
