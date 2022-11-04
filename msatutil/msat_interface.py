@@ -107,19 +107,7 @@ def timeit(func):
         print(f"{func.__name__} done in {time.time()-start} s")
 
     return wrapper
-
-
-def vcd_o4(p0, t0, rh0):
-    """
-    Uses formula by Beirle et al. 2022 https://doi.org/10.5194/amt-15-987-2022 to compute O4 VCD
-    p0: surface pressure (hPa)
-    t0: surface temperture (K)
-    rh0: surface relative humidity (unitless)
-    """
-
-    r = 6.733e39 / (1.774 + 0.1182 * rh0) * (p0 ** 2 / t0)
-
-    return r
+    
 
 def get_msat(indir,srchstr="Methane*.nc"):
     """
