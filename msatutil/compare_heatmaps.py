@@ -9,6 +9,7 @@ def compare_heatmaps(
     grp: Optional[str] = None,
     sv_var: Optional[str] = None,
     option: Optional[str] = None,
+    option_axis: Optional[str] = None,
     hist_nbins: int = 40,
     hist_xlim: Annotated[Sequence[float], 2] = None,
     vminmax: Optional[Annotated[Sequence[float], 2]] = None,
@@ -21,6 +22,7 @@ def compare_heatmaps(
     lat_lim: Optional[Annotated[Sequence[float], 2]] = None,
     res: float = 20,
     scale: float = 1.0,
+    exp_fmt: bool = True,
 ) -> Tuple[plt.Figure, Annotated[Sequence[plt.Axes], 3], np.ndarray, np.ndarray]:
     """
     Make a 3-panel plot comparing a given variables between two sets of msat files by showing one heatmap for each and one histogram
@@ -29,17 +31,22 @@ def compare_heatmaps(
     labs: list of 2 labels to use for the legend and subplots titles for msat_1 and msat_2, respectively
     var: partial variable name (will use msat_nc.fetch method to get it)
     grp: if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
+    sv_var: when the variable is one of APosterioriState or APrioriState, this selects for the state vector variable
+    option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
+    option_axis: the axis along which the stat is applied
     hist_nbins: number of bins for the histogram 
     hist_xlim: horizontal axis range for the histogram
-    vminmax: list of 2 elements for the min and max of the heatmap colorbars
+    vminmax: [min,max] of the heatmap colorbars
     ratio: if True, divide the variable by its median
     ylim: vertical axis range for the heatmaps
     save_path: full path to save the figure
+    extra_id: when using 3D data, slice the 3rd dimension with this index
     data_in: list of the data to plot [x1,x2] corresponding to msat_1 and msat_2, if given, uses this data instead of reading the variable with pmesh_prep
     lon_lim: [min,max] longitudes for the gridding
     lat_lim: [min,max] latitudes for the gridding
     res: the resolution (in meters) of the grid with lon_lim and lat_lim are given
     scale: quantity to multiply the variable with (can be useful to avoid overflow in the standard deviation of column amounts)
+    exp_fmt: if True, use .3e format for stats in the histogram legend. If false use .2f format
     """
 
     fig, ax = plt.subplot_mosaic(
@@ -60,7 +67,7 @@ def compare_heatmaps(
     else:
         ax["upper left"].set_ylim(ylim)
         ax["lower left"].set_ylim(ylim)
-        
+
     for curax in [ax["upper left"], ax["lower left"]]:
         if gridded:
             curax.set_ylabel("Latitude")
@@ -85,6 +92,7 @@ def compare_heatmaps(
                 sv_var=sv_var,
                 extra_id=extra_id,
                 option=option,
+                option_axis=option_axis,
                 lon_lim=lon_lim,
                 lat_lim=lat_lim,
                 res=res,
@@ -95,20 +103,31 @@ def compare_heatmaps(
                 sv_var=sv_var,
                 extra_id=extra_id,
                 option=option,
+                option_axis=option_axis,
                 lon_lim=lon_lim,
                 lat_lim=lat_lim,
                 res=res,
             )
         else:
             x1 = msat_1.pmesh_prep(
-                var, grp=grp, sv_var=sv_var, extra_id=extra_id, option=option
+                var,
+                grp=grp,
+                sv_var=sv_var,
+                extra_id=extra_id,
+                option=option,
+                option_axis=option_axis,
             )
             x2 = msat_2.pmesh_prep(
-                var, grp=grp, sv_var=sv_var, extra_id=extra_id, option=option
+                var,
+                grp=grp,
+                sv_var=sv_var,
+                extra_id=extra_id,
+                option=option,
+                option_axis=option_axis,
             )
 
-        x1 = x1*scale
-        x2 = x2*scale
+        x1 = x1 * scale
+        x2 = x2 * scale
 
         if ratio:
             x1 = x1 / np.nanmedian(x1)
@@ -151,7 +170,10 @@ def compare_heatmaps(
     plt.colorbar(m1, label=lab, ax=[ax["upper left"], ax["lower left"]])
 
     if hist_xlim is None:
-        hist_xlim = [np.nanmin([np.nanmin(x1),np.nanmin(x2)]),np.nanmax([np.nanmax(x1),np.nanmax(x2)])]
+        hist_xlim = [
+            np.nanmin([np.nanmin(x1), np.nanmin(x2)]),
+            np.nanmax([np.nanmax(x1), np.nanmax(x2)]),
+        ]
 
     # make the histograms
     maxval1 = make_hist(
@@ -161,6 +183,7 @@ def compare_heatmaps(
         "blue",
         rng=hist_xlim,
         nbins=hist_nbins,
+        exp_fmt=exp_fmt
     )
     maxval2 = make_hist(
         ax["right"],
@@ -169,6 +192,7 @@ def compare_heatmaps(
         "red",
         rng=hist_xlim,
         nbins=hist_nbins,
+        exp_fmt=exp_fmt
     )
 
     ax["right"].set_ylim(0, 1.25 * np.max([maxval1, maxval2]))
@@ -186,7 +210,7 @@ def make_hist(
     color: str,
     rng: Optional[Annotated[Sequence[float], 2]] = None,
     nbins: Optional[int] = None,
-    exp_fmt: bool = True
+    exp_fmt: bool = True,
 ):
     """
     Make a historgram of the data in x
@@ -203,9 +227,13 @@ def make_hist(
         x_std = np.nanstd(x_rng, ddof=1)
         x_med = np.nanmedian(x_rng)
         if exp_fmt:
-            label = label=f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
+            label = (
+                label
+            ) = f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
         else:
-            label = label=f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
+            label = (
+                label
+            ) = f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
         bin_vals, bin_edges, patches = ax.hist(
             x,
             edgecolor=color,
@@ -220,15 +248,11 @@ def make_hist(
         x_std = np.nanstd(x, ddof=1)
         x_med = np.nanmedian(x)
         if exp_fmt:
-            label=f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
+            label = f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
         else:
-            label=f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
+            label = f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
         bin_vals, bin_edges, patches = ax.hist(
-            x,
-            edgecolor=color,
-            facecolor="None",
-            label=label,
-            histtype="step",
+            x, edgecolor=color, facecolor="None", label=label, histtype="step",
         )
     ax.axvline(x=x_med, color=color, linestyle="--")
     ax.legend(frameon=False)
@@ -318,7 +342,7 @@ def main():
         type=float,
         default=1.0,
         help="quantity to multiply the variable with (can be useful to avoid overflow in the standard deviation of column amounts)",
-    )    
+    )
     parser.add_argument(
         "-r",
         "--ratio",
