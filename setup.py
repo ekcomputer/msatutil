@@ -9,7 +9,12 @@ setup(
     author='Sebastien Roche',
     author_email='sroche@g.harvard.edu',
     version='1.0.0',  # make sure stays in sync with the version in msatutil/__init__.py
-    url='',
+    url='https://github.com/rocheseb/msatutil',
+    classifiers=[
+        'Operating System :: OS Independent',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3.9',
+    ],
     install_requires=[
         'dask',
         'netcdf4',
@@ -19,4 +24,6 @@ setup(
     ],
     packages=find_packages(),
     include_package_data=True,
+    license='MIT',
+    python_requires='>=3.9'
 )
