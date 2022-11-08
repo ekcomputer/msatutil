@@ -6,7 +6,7 @@ from netCDF4 import Dataset
 import warnings
 
 
-def check_granule_radiances(
+def check_granule_radiance(
     l1_infile: str, threshold: float = 0.04, save_path: Optional[str] = None
 ) -> None:
     """
