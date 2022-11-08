@@ -42,7 +42,7 @@ def check_granule_radiances(
 
     plot(flat_std_norm_rad, marker="o", linewidth=0)
     title("Standard deviation of normalized radiances")
-    xlabel("spectral index")
+    xlabel("pixel index")
     if save_path is not None:
         save_name = os.path.join(
             save_path, os.path.basename(l1_infile).replace(".nc", "_std_norm_rad.png")
