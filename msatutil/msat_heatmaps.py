@@ -96,9 +96,7 @@ def main():
         default=0,
         help="integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables",
     )
-    parser.add_argument(
-        "--search", default="proxy.nc", help="string pattern to select msat files"
-    )
+    parser.add_argument("--search", default="proxy.nc", help="string pattern to select msat files")
     parser.add_argument(
         "-r",
         "--ratio",
@@ -106,24 +104,13 @@ def main():
         help="if given, plots the variable divided by its median",
     )
     parser.add_argument(
-        "--vminmax",
-        nargs=2,
-        type=float,
-        default=None,
-        help="min and max values for the colorbar",
+        "--vminmax", nargs=2, type=float, default=None, help="min and max values for the colorbar",
     )
     parser.add_argument(
-        "--ylim",
-        nargs=2,
-        type=float,
-        default=[25, 200],
-        help="sets vertical axis limits",
+        "--ylim", nargs=2, type=float, default=[25, 200], help="sets vertical axis limits",
     )
     parser.add_argument(
-        "-s",
-        "--save-path",
-        default="",
-        help="full filepath to save the plot (includes filename)",
+        "-s", "--save-path", default="", help="full filepath to save the plot (includes filename)",
     )
     parser.add_argument(
         "--use-dask", action="store_true", help="if given, use dask to handle the data"

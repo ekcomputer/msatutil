@@ -41,10 +41,7 @@ def meters_to_lat_lon(x: float, lat: float) -> float:
     """
     lat = np.deg2rad(lat)
     meters_per_lat_degree = (
-        111132.92
-        - 559.82 * np.cos(2 * lat)
-        + 1.175 * np.cos(4 * lat)
-        - 0.0023 * np.cos(6 * lat)
+        111132.92 - 559.82 * np.cos(2 * lat) + 1.175 * np.cos(4 * lat) - 0.0023 * np.cos(6 * lat)
     )
 
     meters_per_lon_degree = (
@@ -54,9 +51,7 @@ def meters_to_lat_lon(x: float, lat: float) -> float:
     return x / meters_per_lat_degree, x / meters_per_lon_degree
 
 
-def filter_large_triangles(
-    points: np.ndarray, tri: Optional[Delaunay] = None, coeff: float = 2.0
-):
+def filter_large_triangles(points: np.ndarray, tri: Optional[Delaunay] = None, coeff: float = 2.0):
     """
     Filter out triangles that have an edge > coeff * median(edge)
     Inputs:
@@ -107,20 +102,22 @@ def timeit(func):
         print(f"{func.__name__} done in {time.time()-start} s")
 
     return wrapper
-    
 
-def get_msat(indir,srchstr="Methane*.nc"):
+
+def get_msat(indir, srchstr="Methane*.nc"):
     """
     Function to get the L1B or L2 files under indir into a msat_collection object
     """
-    flist = glob.glob(os.path.join(indir,srchstr))
-    return msat_collection(flist,use_dask=True)
+    flist = glob.glob(os.path.join(indir, srchstr))
+    return msat_collection(flist, use_dask=True)
+
 
 class msat_file(msat_nc):
     """
     Class to interface with a single MethaneSAT/AIR L1B or L2 file
     It has methods to make simple plots.
     """
+
     def __init__(self, msat_file: str, use_dask: bool = False) -> None:
         super().__init__(msat_file, use_dask=use_dask)
 
@@ -134,9 +131,7 @@ class msat_file(msat_nc):
             else:
                 self.dp = da.from_array(
                     self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
-                ) - da.from_array(
-                    self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice]
-                )
+                ) - da.from_array(self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice])
         except:
             pass
 
@@ -149,9 +144,7 @@ class msat_file(msat_nc):
     def close(self) -> None:
         self.nc_dset.close()
 
-    def get_var(
-        self, var: str, grp: Optional[str] = None, chunks: Union[str, Tuple] = "auto"
-    ):
+    def get_var(self, var: str, grp: Optional[str] = None, chunks: Union[str, Tuple] = "auto"):
         """
         return a variable array from the netcdf file
         var: complete variable name
@@ -209,17 +202,9 @@ class msat_file(msat_nc):
         label: label for the legend
         """
         ax[0].axhline(y=0, linestyle="--", color="black")
-        line = self.plot_var(
-            ax[0], "Posteriori_RTM_Band1", "ResidualRadiance", j, i, label
-        )
+        line = self.plot_var(ax[0], "Posteriori_RTM_Band1", "ResidualRadiance", j, i, label)
         self.plot_var(
-            ax[1],
-            "Posteriori_RTM_Band1",
-            "ObservedRadiance",
-            j,
-            i,
-            "Obs",
-            color=line.get_color(),
+            ax[1], "Posteriori_RTM_Band1", "ObservedRadiance", j, i, "Obs", color=line.get_color(),
         )
         self.plot_var(
             ax[1],
@@ -334,9 +319,7 @@ class msat_file(msat_nc):
         for key, val in sv_dict.items():
             if key.startswith("SubStateName") and val.strip() == var:
                 num = int(key.split("_")[-1]) - 1
-                slice = np.arange(
-                    sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num]
-                )
+                slice = np.arange(sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num])
                 break
 
         return slice
@@ -361,6 +344,7 @@ class msat_collection:
     grid_prep: is similar to pmesh_prep but puts the data onto a regular lat-lon grid
     heatmap: show a pcolormesh plot of the given variable
     """
+
     def __init__(
         self,
         file_list: str,
@@ -372,9 +356,7 @@ class msat_collection:
         try:
             dates = np.array(
                 [
-                    datetime.strptime(
-                        os.path.basename(file_path).split("_")[3], "%Y%m%dT%H%M%S"
-                    )
+                    datetime.strptime(os.path.basename(file_path).split("_")[3], "%Y%m%dT%H%M%S")
                     for file_path in file_list
                 ]
             )
@@ -397,10 +379,7 @@ class msat_collection:
         )
         self.ids_rev = {val: key for key, val in self.ids.items()}
         self.msat_files = OrderedDict(
-            [
-                (file_path, msat_file(file_path, use_dask=use_dask))
-                for file_path in file_list
-            ]
+            [(file_path, msat_file(file_path, use_dask=use_dask)) for file_path in file_list]
         )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
@@ -427,9 +406,7 @@ class msat_collection:
         """
 
         if date_range is not None:
-            ids = np.where(
-                (self.dates >= date_range[0]) & (self.dates < date_range[1])
-            )[0]
+            ids = np.where((self.dates >= date_range[0]) & (self.dates < date_range[1]))[0]
 
         return msat_collection([self.file_paths[i] for i in ids], use_dask=use_dask)
 
@@ -445,13 +422,7 @@ class msat_collection:
         self.fig.set_size_inches(10, 8)
 
     def plot_var(
-        self,
-        grp: str,
-        var: str,
-        j: int,
-        i: int,
-        ids: Optional[List[int]] = None,
-        ax=None,
+        self, grp: str, var: str, j: int, i: int, ids: Optional[List[int]] = None, ax=None,
     ) -> None:
         """
         Plot a given variable at a given pixel
@@ -468,9 +439,7 @@ class msat_collection:
             ids = self.ids.keys()
         ax.grid(True)
         if hasattr(self.msat_files[self.ids[0]].nc_dset[grp][var], "units"):
-            ax.set_ylabel(
-                f"{grp} {var} {self.msat_files[self.ids[0]].nc_dset[grp][var].units}"
-            )
+            ax.set_ylabel(f"{grp} {var} {self.msat_files[self.ids[0]].nc_dset[grp][var].units}")
         else:
             ax.set_ylabel(f"{grp} {var}")
 
@@ -504,9 +473,7 @@ class msat_collection:
         if ids is None:
             ids = self.ids.keys()
         self.init_plot(3)
-        self.plot_var(
-            "Posteriori_RTM_Band1", "ResidualRadiance", j, i, ids=ids, ax=self.ax[0]
-        )
+        self.plot_var("Posteriori_RTM_Band1", "ResidualRadiance", j, i, ids=ids, ax=self.ax[0])
         self.ax[0].set_title("% Residuals")
 
         # dP and rms plots
@@ -609,9 +576,7 @@ class msat_collection:
                 if grp is None:
                     x.append(self.msat_files[i].fetch(var, chunks=chunks).T)
                 else:
-                    x.append(
-                        self.msat_files[i].get_var(var, grp, chunks=chunks)[nc_slice].T
-                    )
+                    x.append(self.msat_files[i].get_var(var, grp, chunks=chunks)[nc_slice].T)
         if len(x[0].shape) == 1:
             axis = 0
         elif "along_track" in self.msat_files[i].nc_dset.dimensions:
@@ -741,17 +706,11 @@ class msat_collection:
             flat_lon = lon[nonan].compute()
 
             x_grid = griddata(
-                (flat_lon, flat_lat),
-                flat_x,
-                (lon_grid, lat_grid),
-                method=method,
-                rescale=True,
+                (flat_lon, flat_lat), flat_x, (lon_grid, lat_grid), method=method, rescale=True,
             )
 
             cloud_points = _ndim_coords_from_arrays((flat_lon, flat_lat))
-            regrid_points = _ndim_coords_from_arrays(
-                (lon_grid.ravel(), lat_grid.ravel())
-            )
+            regrid_points = _ndim_coords_from_arrays((lon_grid.ravel(), lat_grid.ravel()))
             tri = Delaunay(cloud_points)
 
             outside_hull = np.zeros(lon_grid.size).astype(bool)
@@ -773,15 +732,11 @@ class msat_collection:
                 for j, neighbor_id in enumerate(triangle):
                     if neighbor_id in large_triangle_ids:
                         # reindex the neighbors to match the size of the subset
-                        subset_tri.neighbors[i, j] = np.where(
-                            large_triangle_ids == neighbor_id
-                        )[0]
+                        subset_tri.neighbors[i, j] = np.where(large_triangle_ids == neighbor_id)[0]
                     elif neighbor_id >= 0 and (neighbor_id not in large_triangle_ids):
                         # that neighbor was a "normal" triangle that should not exist in the subset
                         subset_tri.neighbors[i, j] = -1
-            inside_large_triangles = (
-                subset_tri.find_simplex(regrid_points, bruteforce=True) >= 0
-            )
+            inside_large_triangles = subset_tri.find_simplex(regrid_points, bruteforce=True) >= 0
             invalid_slice = np.logical_or(outside_hull, inside_large_triangles)
             x_grid[invalid_slice.reshape(x_grid.shape)] = np.nan
 
@@ -892,31 +847,20 @@ class msat_collection:
                     if "xtrack" not in outfile.dimensions:
                         outfile.createDimension("atrack", lat_grid.shape([0]))
                     if "latitude" not in outfile.variables:
-                        outfile.createVariable(
-                            "latitude", lat_grid.shape, ("xtrack", "atrack")
-                        )
+                        outfile.createVariable("latitude", lat_grid.shape, ("xtrack", "atrack"))
                         outfile["latitude"][:] = lat_grid
                     if "longitude" not in outfile.variables:
-                        outfile.createVariable(
-                            "longitude", lat_grid.shape, ("xtrack", "atrack")
-                        )
+                        outfile.createVariable("longitude", lat_grid.shape, ("xtrack", "atrack"))
                         outfile["longitude"][:] = lon_grid
                     if save_nc[1] not in outfile.variables:
-                        outfile.createVariable(
-                            save_nc[1], lat_grid.shape, ("xtrack", "atrack")
-                        )
+                        outfile.createVariable(save_nc[1], lat_grid.shape, ("xtrack", "atrack"))
                     outfile[save_nc[1]] = gridded_x
 
             if vminmax is None:
                 m = ax.pcolormesh(lon_grid, lat_grid, gridded_x, cmap="viridis")
             else:
                 m = ax.pcolormesh(
-                    lon_grid,
-                    lat_grid,
-                    gridded_x,
-                    cmap="viridis",
-                    vmin=vminmax[0],
-                    vmax=vminmax[1],
+                    lon_grid, lat_grid, gridded_x, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1],
                 )
         else:
             if gridded:

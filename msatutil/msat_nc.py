@@ -24,6 +24,7 @@ class msat_nc:
     This class holds a netCDF.Dataset for a MethaneSAT/AIR L1B or L2 file.
     It contains methods that help navigate the dataset more quickly
     """
+
     def __init__(self, infile: str, use_dask: bool = False) -> None:
         self.use_dask = use_dask
         self.exists = os.path.exists(infile)
@@ -125,9 +126,7 @@ class msat_nc:
         for key, val in sv_dict.items():
             if key.startswith("SubStateName") and val.strip() == var:
                 num = int(key.split("_")[-1]) - 1
-                slice = np.arange(
-                    sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num]
-                )
+                slice = np.arange(sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num])
                 break
 
         return slice
@@ -148,18 +147,11 @@ class msat_nc:
                     print(f"GROUP: {grp}")
                 for var in self.nc_dset[grp].variables:
                     if key in var.lower():
-                        print(
-                            f"GROUP: {grp}\tVAR: {var} {self.nc_dset[grp][var].dimensions}"
-                        )
+                        print(f"GROUP: {grp}\tVAR: {var} {self.nc_dset[grp][var].dimensions}")
                     if var == "APosterioriState":
-                        sv_dict = self.nc_dset[
-                            "SpecFitDiagnostics/APosterioriState"
-                        ].__dict__
+                        sv_dict = self.nc_dset["SpecFitDiagnostics/APosterioriState"].__dict__
                         for sv_key, val in sv_dict.items():
-                            if (
-                                sv_key.startswith("SubStateName")
-                                and key in val.strip().lower()
-                            ):
+                            if sv_key.startswith("SubStateName") and key in val.strip().lower():
                                 print(
                                     f"GROUP: {grp}\tVAR: {var} {self.nc_dset[grp][var].dimensions} \tSV_VAR: {val.strip()} \tSV_SLICE: {list(self.get_sv_slice(val.strip()))}"
                                 )
@@ -249,9 +241,7 @@ class msat_nc:
                         return f"{grp}/{var}"
 
     @staticmethod
-    def nctime_to_pytime(
-        nc_time_var: ncdf.Variable,
-    ) -> Union[np.ndarray, np.ma.masked_array]:
+    def nctime_to_pytime(nc_time_var: ncdf.Variable,) -> Union[np.ndarray, np.ma.masked_array]:
         """
         Convert time in a netCDF variable to an array of Python datetime objects.
         """
@@ -268,9 +258,5 @@ class msat_nc:
             units = nc_time_var.units
 
         return ncdf.num2date(
-            nc_time_var[:],
-            units=units,
-            calendar=calendar,
-            only_use_cftime_datetimes=False,
+            nc_time_var[:], units=units, calendar=calendar, only_use_cftime_datetimes=False,
         )
-

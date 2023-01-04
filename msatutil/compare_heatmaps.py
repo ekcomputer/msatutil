@@ -50,8 +50,7 @@ def compare_heatmaps(
     """
 
     fig, ax = plt.subplot_mosaic(
-        [["upper left", "right"], ["lower left", "right"]],
-        gridspec_kw={"width_ratios": [2.5, 2]},
+        [["upper left", "right"], ["lower left", "right"]], gridspec_kw={"width_ratios": [2.5, 2]},
     )
     fig.set_size_inches(12, 10)
     plt.subplots_adjust(wspace=0.3)
@@ -149,12 +148,8 @@ def compare_heatmaps(
             lon_grid2, lat_grid2, x2, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1]
         )
     else:
-        m1 = ax["upper left"].pcolormesh(
-            x1, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1]
-        )
-        m2 = ax["lower left"].pcolormesh(
-            x2, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1]
-        )
+        m1 = ax["upper left"].pcolormesh(x1, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1])
+        m2 = ax["lower left"].pcolormesh(x2, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1])
     if var == "dp":
         lab = "$\Delta P$"
     elif sv_var:
@@ -183,7 +178,7 @@ def compare_heatmaps(
         "blue",
         rng=hist_xlim,
         nbins=hist_nbins,
-        exp_fmt=exp_fmt
+        exp_fmt=exp_fmt,
     )
     maxval2 = make_hist(
         ax["right"],
@@ -192,7 +187,7 @@ def compare_heatmaps(
         "red",
         rng=hist_xlim,
         nbins=hist_nbins,
-        exp_fmt=exp_fmt
+        exp_fmt=exp_fmt,
     )
 
     ax["right"].set_ylim(0, 1.25 * np.max([maxval1, maxval2]))
@@ -264,12 +259,10 @@ def main():
         description="Make a 4 panel plots compating a given variables between two sets of msat files by showing one heatmap for each and one histogram"
     )
     parser.add_argument(
-        "path1",
-        help="full path to the directory where the first set of msat files exists",
+        "path1", help="full path to the directory where the first set of msat files exists",
     )
     parser.add_argument(
-        "path2",
-        help="full path to the directory where the second set of msat files exists",
+        "path2", help="full path to the directory where the second set of msat files exists",
     )
     parser.add_argument("var", help="variable name")
     parser.add_argument(
@@ -287,15 +280,9 @@ def main():
         default=0,
         help="integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables",
     )
+    parser.add_argument("--search", default="proxy.nc", help="string pattern to select msat files")
     parser.add_argument(
-        "--search", default="proxy.nc", help="string pattern to select msat files"
-    )
-    parser.add_argument(
-        "--vminmax",
-        nargs=2,
-        type=float,
-        default=None,
-        help="min and max values for the colorbar",
+        "--vminmax", nargs=2, type=float, default=None, help="min and max values for the colorbar",
     )
     parser.add_argument(
         "--ylim",
@@ -332,10 +319,7 @@ def main():
         help="sets horizontal axis limits for histograms",
     )
     parser.add_argument(
-        "--hist-nbins",
-        default=40,
-        type=int,
-        help="sets the number of bins for the histograms",
+        "--hist-nbins", default=40, type=int, help="sets the number of bins for the histograms",
     )
     parser.add_argument(
         "--scale",
@@ -350,10 +334,7 @@ def main():
         help="if given, plots the variable divided by its median",
     )
     parser.add_argument(
-        "-s",
-        "--save-path",
-        default="",
-        help="full filepath to save the plot (includes filename)",
+        "-s", "--save-path", default="", help="full filepath to save the plot (includes filename)",
     )
     parser.add_argument(
         "--use-dask", action="store_true", help="if given, use dask to handle the data"

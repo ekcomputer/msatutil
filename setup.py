@@ -4,26 +4,20 @@ from setuptools import setup, find_packages
 _mydir = os.path.dirname(__file__)
 
 setup(
-    name='msatutil',
-    description='Utility codes to read and plot from MethaneSAT/AIR files',
-    author='Sebastien Roche',
-    author_email='sroche@g.harvard.edu',
-    version='1.0.0',  # make sure stays in sync with the version in msatutil/__init__.py
-    url='https://github.com/rocheseb/msatutil',
+    name="msatutil",
+    description="Utility codes to read and plot from MethaneSAT/AIR files",
+    author="Sebastien Roche",
+    author_email="sroche@g.harvard.edu",
+    version="1.0.0",  # make sure stays in sync with the version in msatutil/__init__.py
+    url="https://github.com/rocheseb/msatutil",
     classifiers=[
-        'Operating System :: OS Independent',
-        'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.9',
+        "Operating System :: OS Independent",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.9",
     ],
-    install_requires=[
-        'dask',
-        'netcdf4',
-        'matplotlib',
-        'pandas',
-        'scipy',
-    ],
+    install_requires=["dask", "netcdf4", "matplotlib", "pandas", "scipy",],
     packages=find_packages(),
     include_package_data=True,
-    license='MIT',
-    python_requires='>=3.9'
+    license="MIT",
+    python_requires=">=3.9",
 )

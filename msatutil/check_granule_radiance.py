@@ -59,8 +59,7 @@ def check_granule_radiance(
         ylabel("Radiance")
         if save_path is not None:
             save_name = os.path.join(
-                save_path,
-                os.path.basename(l1_infile).replace(".nc", "_bad_spectra.png"),
+                save_path, os.path.basename(l1_infile).replace(".nc", "_bad_spectra.png"),
             )
             gcf().savefig(save_name)
         else:
@@ -88,9 +87,7 @@ def main():
     )
     args = parser.parse_args()
 
-    check_granule_radiances(
-        args.l1_infile, threshold=args.threshold, save_path=args.save_path
-    )
+    check_granule_radiances(args.l1_infile, threshold=args.threshold, save_path=args.save_path)
 
 
 if __name__ == "__main__":
