@@ -368,7 +368,7 @@ class msat_collection:
                 file_list = file_list[(dates > date_range[0]) & (dates < date_range[1])]
                 dates = dates[(dates > date_range[0]) & (dates < date_range[1])]
             self.dates = dates
-        except ValueError, IndexError:
+        except (ValueError, IndexError):
             print("/!\\ The file names do not have the typical methaneair format")
             self.dates = None
 
