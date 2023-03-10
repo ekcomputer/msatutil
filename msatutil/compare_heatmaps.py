@@ -1,4 +1,12 @@
-from msatutil.msat_interface import *
+from __future__ import annotations
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import argparse
+from datetime import datetime
+from typing import Optional, Sequence, Tuple, Annotated
+
+from msatutil.msat_interface import msat_collection
 
 
 def compare_heatmaps(
@@ -34,7 +42,7 @@ def compare_heatmaps(
     sv_var: when the variable is one of APosterioriState or APrioriState, this selects for the state vector variable
     option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
     option_axis: the axis along which the stat is applied
-    hist_nbins: number of bins for the histogram 
+    hist_nbins: number of bins for the histogram
     hist_xlim: horizontal axis range for the histogram
     vminmax: [min,max] of the heatmap colorbars
     ratio: if True, divide the variable by its median
@@ -50,7 +58,8 @@ def compare_heatmaps(
     """
 
     fig, ax = plt.subplot_mosaic(
-        [["upper left", "right"], ["lower left", "right"]], gridspec_kw={"width_ratios": [2.5, 2]},
+        [["upper left", "right"], ["lower left", "right"]],
+        gridspec_kw={"width_ratios": [2.5, 2]},
     )
     fig.set_size_inches(12, 10)
     plt.subplots_adjust(wspace=0.3)
@@ -247,7 +256,11 @@ def make_hist(
         else:
             label = f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
         bin_vals, bin_edges, patches = ax.hist(
-            x, edgecolor=color, facecolor="None", label=label, histtype="step",
+            x,
+            edgecolor=color,
+            facecolor="None",
+            label=label,
+            histtype="step",
         )
     ax.axvline(x=x_med, color=color, linestyle="--")
     ax.legend(frameon=False)
@@ -259,10 +272,12 @@ def main():
         description="Make a 4 panel plots compating a given variables between two sets of msat files by showing one heatmap for each and one histogram"
     )
     parser.add_argument(
-        "path1", help="full path to the directory where the first set of msat files exists",
+        "path1",
+        help="full path to the directory where the first set of msat files exists",
     )
     parser.add_argument(
-        "path2", help="full path to the directory where the second set of msat files exists",
+        "path2",
+        help="full path to the directory where the second set of msat files exists",
     )
     parser.add_argument("var", help="variable name")
     parser.add_argument(
@@ -282,7 +297,11 @@ def main():
     )
     parser.add_argument("--search", default="proxy.nc", help="string pattern to select msat files")
     parser.add_argument(
-        "--vminmax", nargs=2, type=float, default=None, help="min and max values for the colorbar",
+        "--vminmax",
+        nargs=2,
+        type=float,
+        default=None,
+        help="min and max values for the colorbar",
     )
     parser.add_argument(
         "--ylim",
@@ -298,7 +317,7 @@ def main():
         default=None,
         help="if given with --lat-lim, regrid the data to --res for the heatmaps",
     )
-    parer.add_argument(
+    parser.add_argument(
         "--res",
         type=float,
         default=20,
@@ -319,7 +338,10 @@ def main():
         help="sets horizontal axis limits for histograms",
     )
     parser.add_argument(
-        "--hist-nbins", default=40, type=int, help="sets the number of bins for the histograms",
+        "--hist-nbins",
+        default=40,
+        type=int,
+        help="sets the number of bins for the histograms",
     )
     parser.add_argument(
         "--scale",
@@ -334,7 +356,10 @@ def main():
         help="if given, plots the variable divided by its median",
     )
     parser.add_argument(
-        "-s", "--save-path", default="", help="full filepath to save the plot (includes filename)",
+        "-s",
+        "--save-path",
+        default="",
+        help="full filepath to save the plot (includes filename)",
     )
     parser.add_argument(
         "--use-dask", action="store_true", help="if given, use dask to handle the data"

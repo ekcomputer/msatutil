@@ -3,27 +3,21 @@ import os
 import sys
 import glob
 import numpy as np
-import pandas as pd
 import netCDF4 as ncdf
 from datetime import datetime
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import argparse
-from msatutil.msat_nc import MSATError, msat_nc
+from msatutil.msat_nc import msat_nc
 from collections import OrderedDict
-from typing import Optional, Sequence, Tuple, Union, Annotated, List, Generator
+from typing import Optional, Sequence, Tuple, Union, Annotated, List
 import dask
 import dask.array as da
-from dask import delayed
-from dask.diagnostics import ProgressBar
 import time
 from scipy.interpolate import griddata
 from scipy.spatial import Delaunay
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import pickle
-import warnings
-from pathlib import Path
 
 
 def meters_to_lat_lon(x: float, lat: float) -> float:
@@ -389,7 +383,7 @@ class msat_collection:
         )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
-        self.is_l2 = "Level1" in self.dsets.values()[0].groups
+        self.is_l2 = "Level1" in list(self.dsets.values())[0].groups
         self.valid_xtrack = self.get_valid_xtrack()
 
         # self.init_plot(1)
@@ -408,7 +402,7 @@ class msat_collection:
         """
         Get the valid cross track indices
         """
-        check_dset = self.dsets[self.msat_files[0]]  # just use any of the datasets
+        check_dset = list(self.dsets.values())[0]  # just use any of the datasets
         if self.is_l2:
             select = slice(None) if "one" not in check_dset[f"Level1/Longitude"].dimensions else 0
             valid_xtrack = np.where(
@@ -420,13 +414,10 @@ class msat_collection:
             else:
                 spec_axis = check_dset["Band1/Radiance"].dimensions.index("w1")
             valid_xtrack = np.where(
-                ~np.isnan(
-                    np.nanmedian(
-                        np.nansum(check_dset[f"Band1/Radiance"][select], axis=spec_axis), axis=0
-                    )
-                )
+                np.nanmedian(np.nansum(check_dset[f"Band1/Radiance"][:], axis=spec_axis), axis=0)
+                > 0
             )[0]
-            valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
+        valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
 
         return valid_xtrack_slice
 
@@ -593,7 +584,7 @@ class msat_collection:
         ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
-        option_axis: the axis along which the stat is applied
+        option_axis: the axis along which the stat is applied (remember the variables are transposed when read)
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         """
         if ids is None:
@@ -691,7 +682,7 @@ class msat_collection:
         ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
-        option_axis: the axis along which the stat is applied
+        option_axis: the axis along which the stat is applied (remember the variables are transposed when read)
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         method: griddata interpolation method
         res: grid resolution in meters
@@ -827,7 +818,7 @@ class msat_collection:
         extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables and when "option" is None
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std'), for example to plot a heatmap of the maximum radiance
-        option_axis: the axis along which the stat is applied (2 is typically along the spectral dimension)
+        option_axis: the axis along which the stat is applied (2 is typically along the spectral dimension, remember the variables are transposed when read)
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         lon_lim: [min,max] longitudes for the gridding
         lat_lim: [min,max] latitudes for the gridding
@@ -878,8 +869,6 @@ class msat_collection:
                     sv_var=sv_var,
                     extra_id=extra_id,
                     ids=ids,
-                    option=option,
-                    option_axis=option_axis,
                     ratio=ratio,
                     chunks=chunks,
                 )
@@ -889,8 +878,6 @@ class msat_collection:
                     sv_var=sv_var,
                     extra_id=extra_id,
                     ids=ids,
-                    option=option,
-                    option_axis=option_axis,
                     ratio=ratio,
                     chunks=chunks,
                 )
@@ -914,7 +901,7 @@ class msat_collection:
             gridded_x = gridded_x * scale
 
             if save_nc:
-                with Dataset(save_nc[0], "r+") as outfile:
+                with ncdf.Dataset(save_nc[0], "r+") as outfile:
                     if "atrack" not in save_nc.dimensions:
                         outfile.createDimension("atrack", lat_grid.shape([1]))
                     if "xtrack" not in outfile.dimensions:
@@ -987,12 +974,16 @@ class msat_collection:
             ax.set_title(
                 f"{datetime.strftime(dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(dates[-1],'%Y%m%dT%H%M%S')}"
             )
-        if gridded:
+        if gridded or latlon:
             ax.set_xlabel("Longitude")
             ax.set_ylabel("Latitude")
         else:
             ax.set_xlabel("along-track index")
             ax.set_ylabel("cross-track index")
+
+        # disable scientific notations in axis numbers
+        ax.get_xaxis().get_major_formatter().set_useOffset(False)
+        ax.get_yaxis().get_major_formatter().set_useOffset(False)
 
         if save_path:
             fig.savefig(save_path)
