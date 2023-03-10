@@ -31,7 +31,7 @@ def meters_to_lat_lon(x: float, lat: float) -> float:
     Convert a distance in meters to latitudinal and longitudinal angles at a given latitude
     https://en.wikipedia.org/wiki/Geographic_coordinate_system
     Uses WGS84 https://en.wikipedia.org/wiki/World_Geodetic_System
-    
+
     Inputs:
         x: distance (meters)
         lat: latitude (degrees)
@@ -204,7 +204,13 @@ class msat_file(msat_nc):
         ax[0].axhline(y=0, linestyle="--", color="black")
         line = self.plot_var(ax[0], "Posteriori_RTM_Band1", "ResidualRadiance", j, i, label)
         self.plot_var(
-            ax[1], "Posteriori_RTM_Band1", "ObservedRadiance", j, i, "Obs", color=line.get_color(),
+            ax[1],
+            "Posteriori_RTM_Band1",
+            "ObservedRadiance",
+            j,
+            i,
+            "Obs",
+            color=line.get_color(),
         )
         self.plot_var(
             ax[1],
@@ -238,7 +244,7 @@ class msat_file(msat_nc):
         i: cross-track pixel index
         label: label for the legend
         color: line color
-        linestyle: matplotlib linestyle 
+        linestyle: matplotlib linestyle
         """
         nc_grp = self.nc_dset[grp]
         if nc_grp[var].shape[0] == 1024:
@@ -383,6 +389,9 @@ class msat_collection:
         )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
+        self.is_l2 = "Level1" in self.dsets.values()[0].groups
+        self.valid_xtrack = self.get_valid_xtrack()
+
         # self.init_plot(1)
 
     def __enter__(self) -> None:
@@ -394,6 +403,32 @@ class msat_collection:
     def close(self) -> None:
         for f in self.msat_files.values():
             f.close()
+
+    def get_valid_xtrack(self):
+        """
+        Get the valid cross track indices
+        """
+        check_dset = self.dsets[self.msat_files[0]]  # just use any of the datasets
+        if self.is_l2:
+            select = slice(None) if "one" not in check_dset[f"Level1/Longitude"].dimensions else 0
+            valid_xtrack = np.where(
+                ~np.isnan(np.nanmedian(check_dset[f"Level1/Longitude"][select], axis=0))
+            )[0]
+        else:
+            if "spectral_channel" in check_dset["Band1/Radiance"].dimensions:
+                spec_axis = check_dset["Band1/Radiance"].dimensions.index("spectral_channel")
+            else:
+                spec_axis = check_dset["Band1/Radiance"].dimensions.index("w1")
+            valid_xtrack = np.where(
+                ~np.isnan(
+                    np.nanmedian(
+                        np.nansum(check_dset[f"Band1/Radiance"][select], axis=spec_axis), axis=0
+                    )
+                )
+            )[0]
+            valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
+
+        return valid_xtrack_slice
 
     def subset(
         self,
@@ -422,7 +457,13 @@ class msat_collection:
         self.fig.set_size_inches(10, 8)
 
     def plot_var(
-        self, grp: str, var: str, j: int, i: int, ids: Optional[List[int]] = None, ax=None,
+        self,
+        grp: str,
+        var: str,
+        j: int,
+        i: int,
+        ids: Optional[List[int]] = None,
+        ax=None,
     ) -> None:
         """
         Plot a given variable at a given pixel
@@ -519,7 +560,7 @@ class msat_collection:
         Make a histogram for the given variable and given files
         grp: complete group name
         var: complete variable name
-        ids: list of ids of the msat files (from the keys of self.ids)        
+        ids: list of ids of the msat files (from the keys of self.ids)
         """
         if ids is None:
             ids = self.ids.keys()
@@ -653,7 +694,7 @@ class msat_collection:
         option_axis: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         method: griddata interpolation method
-        res: grid resolution in meters    
+        res: grid resolution in meters
         """
         if not self.use_dask:
             raise Exception("grid_prep needs self.use_dask==True")
@@ -706,7 +747,11 @@ class msat_collection:
             flat_lon = lon[nonan].compute()
 
             x_grid = griddata(
-                (flat_lon, flat_lat), flat_x, (lon_grid, lat_grid), method=method, rescale=True,
+                (flat_lon, flat_lat),
+                flat_x,
+                (lon_grid, lat_grid),
+                method=method,
+                rescale=True,
             )
 
             cloud_points = _ndim_coords_from_arrays((flat_lon, flat_lat))
@@ -754,6 +799,7 @@ class msat_collection:
         grp: Optional[str] = None,
         sv_var: Optional[str] = None,
         vminmax: Optional[Annotated[Sequence[float], 2]] = None,
+        latlon: bool = False,
         ratio: bool = False,
         ylim: Optional[Annotated[Sequence[float], 2]] = None,
         save_path: Optional[str] = None,
@@ -821,6 +867,33 @@ class msat_collection:
                 chunks=chunks,
             )
             x = x * scale
+            if latlon:
+                if self.is_l2:
+                    grp = "Level1"
+                else:
+                    grp = "Geolocation"
+                lat = self.pmesh_prep(
+                    "Latitude",
+                    grp=grp,
+                    sv_var=sv_var,
+                    extra_id=extra_id,
+                    ids=ids,
+                    option=option,
+                    option_axis=option_axis,
+                    ratio=ratio,
+                    chunks=chunks,
+                )
+                lon = self.pmesh_prep(
+                    "Longitude",
+                    grp=grp,
+                    sv_var=sv_var,
+                    extra_id=extra_id,
+                    ids=ids,
+                    option=option,
+                    option_axis=option_axis,
+                    ratio=ratio,
+                    chunks=chunks,
+                )
         if gridded and self.use_dask:
             lon_grid, lat_grid, gridded_x = self.grid_prep(
                 var,
@@ -860,15 +933,38 @@ class msat_collection:
                 m = ax.pcolormesh(lon_grid, lat_grid, gridded_x, cmap="viridis")
             else:
                 m = ax.pcolormesh(
-                    lon_grid, lat_grid, gridded_x, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1],
+                    lon_grid,
+                    lat_grid,
+                    gridded_x,
+                    cmap="viridis",
+                    vmin=vminmax[0],
+                    vmax=vminmax[1],
                 )
         else:
             if gridded:
                 print("/!\\ the gridded argument only works when self.use_dask is True")
             if vminmax is None:
-                m = ax.pcolormesh(x, cmap="viridis")
+                if latlon:
+                    m = ax.pcolormesh(
+                        lon[self.valid_xtrack],
+                        lat[self.valid_xtrack],
+                        x[self.valid_xtrack],
+                        cmap="viridis",
+                    )
+                else:
+                    m = ax.pcolormesh(x, cmap="viridis")
             else:
-                m = ax.pcolormesh(x, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1])
+                if latlon:
+                    m = ax.pcolormesh(
+                        lon[self.valid_xtrack],
+                        lat[self.valid_xtrack],
+                        x[self.valid_xtrack],
+                        cmap="viridis",
+                        vmin=vminmax[0],
+                        vmax=vminmax[1],
+                    )
+                else:
+                    m = ax.pcolormesh(x, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1])
 
         if var == "dp":
             lab = "$\Delta P$"
@@ -947,7 +1043,7 @@ class msat_collection:
     def show_group(self, grp: str) -> None:
         """
         Show all the variable names and dimensions of a given group
-        grp: complete group name 
+        grp: complete group name
         """
         self.msat_files[self.ids[0]].show_group(grp)
 
