@@ -8,7 +8,7 @@ from datetime import datetime
 import matplotlib
 import matplotlib.pyplot as plt
 import argparse
-from msatutil.msat_nc import msat_nc
+from msatutil.msat_nc import msat_nc, MSATError
 from collections import OrderedDict
 from typing import Optional, Sequence, Tuple, Union, Annotated, List
 import dask
@@ -114,44 +114,6 @@ class msat_file(msat_nc):
 
     def __init__(self, msat_file: str, use_dask: bool = False) -> None:
         super().__init__(msat_file, use_dask=use_dask)
-
-        try:  # this is a try so we can use the same class to read the L1 files
-            sp_slice = self.get_sv_slice("SurfacePressure")
-            if not self.use_dask:
-                self.dp = (
-                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
-                    - self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice]
-                )
-            else:
-                self.dp = da.from_array(
-                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
-                ) - da.from_array(self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice])
-        except:
-            pass
-
-    def __enter__(self) -> None:
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.close()
-
-    def close(self) -> None:
-        self.nc_dset.close()
-
-    def get_var(self, var: str, grp: Optional[str] = None, chunks: Union[str, Tuple] = "auto"):
-        """
-        return a variable array from the netcdf file
-        var: complete variable name
-        grp: complete group name
-        chunks: when self.use_dask is True, sets the chunk size for dask arrays
-        """
-        if var == "dp":
-            return self.dp
-        else:
-            return super().get_var(var, grp=grp, chunks=chunks)
-
-    def fetch_varpath(self, key, grp: Optional[str] = None) -> str:
-        return super().fetch_varpath(key, grp=grp)
 
     def hist(
         self, ax: plt.Axes, grp: str, var: str, label: str, color: Optional[str] = None
@@ -288,52 +250,6 @@ class msat_file(msat_nc):
 
         return line[0]
 
-    def get_pixel_dp(self, j: int, i: int) -> float:
-        """
-        Calculate posterior minus prior surface pressure
-        j: along-track pixel index
-        i: cross-track pixel index
-        """
-        sp_slice = self.get_sv_slice("SurfacePressure")
-        dp = (
-            self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice, j, i]
-            - self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice, j, i]
-        )
-
-        return dp[0]
-
-    def get_pixel_rms(self, j: int, i: int) -> float:
-        """
-        j: along-track pixel index
-        i: cross-track pixel index
-        """
-        return self.nc_dset["SpecFitDiagnostics"]["FitResidualRMS"][:, j, i][0]
-
-    def get_sv_slice(self, var: str) -> np.ndarray:
-        """
-        Get the state vector index for the given variable
-        var: complete state vector variable name
-        """
-        sv_dict = self.nc_dset["SpecFitDiagnostics"]["APosterioriState"].__dict__
-
-        for key, val in sv_dict.items():
-            if key.startswith("SubStateName") and val.strip() == var:
-                num = int(key.split("_")[-1]) - 1
-                slice = np.arange(sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num])
-                break
-
-        return slice
-
-    def show_sv(self) -> None:
-        """
-        Display the state vector variable names
-        """
-        sv_dict = self.nc_dset["SpecFitDiagnostics"]["APosterioriState"].__dict__
-        for key, val in sv_dict.items():
-            if type(val) == str:
-                val = val.strip()
-            print(f"{key.strip()}: {val}")
-
 
 class msat_collection:
     """
@@ -383,10 +299,23 @@ class msat_collection:
         )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
-        self.is_l2 = "Level1" in list(self.dsets.values())[0].groups
+        self.is_l2 = self.msat_files[self.ids[0]].is_l2
         self.valid_xtrack = self.get_valid_xtrack()
-
-        # self.init_plot(1)
+        self.valid_rad = self.get_valid_rad()
+        # when using self.get_dim_map(var_path), the result maps dimensions to dimension axis using the common set of dimensions names common_dim_set
+        self.common_dim_set = [
+            "one",
+            "xtrack",
+            "atrack",
+            "xtrack_edge",
+            "atrack_edge",
+            "lev",
+            "lev_edge",
+            "corner",
+            "spectral_channel",
+            "xmx",
+            "nsubx",
+        ]
 
     def __enter__(self) -> None:
         return self
@@ -402,24 +331,19 @@ class msat_collection:
         """
         Get the valid cross track indices
         """
-        check_dset = list(self.dsets.values())[0]  # just use any of the datasets
-        if self.is_l2:
-            select = slice(None) if "one" not in check_dset[f"Level1/Longitude"].dimensions else 0
-            valid_xtrack = np.where(
-                ~np.isnan(np.nanmedian(check_dset[f"Level1/Longitude"][select], axis=0))
-            )[0]
-        else:
-            if "spectral_channel" in check_dset["Band1/Radiance"].dimensions:
-                spec_axis = check_dset["Band1/Radiance"].dimensions.index("spectral_channel")
-            else:
-                spec_axis = check_dset["Band1/Radiance"].dimensions.index("w1")
-            valid_xtrack = np.where(
-                np.nanmedian(np.nansum(check_dset[f"Band1/Radiance"][:], axis=spec_axis), axis=0)
-                > 0
-            )[0]
-        valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
+        return self.msat_files[self.ids[0]].get_valid_xtrack()
 
-        return valid_xtrack_slice
+    def get_valid_rad(self):
+        """
+        Get the valid radiance indices
+        """
+        return self.msat_files[self.ids[0]].get_valid_rad()
+
+    def get_dim_map(self, var_path: str):
+        """
+        Get the dimension map of the given variable
+        """
+        return self.msat_files[self.ids[0]].get_dim_map(var_path)
 
     def subset(
         self,
@@ -569,10 +493,11 @@ class msat_collection:
         grp: Optional[str] = None,
         sv_var: Optional[str] = None,
         extra_id: Optional[int] = None,
+        extra_id_dim: Optional[str] = None,
         ids: Optional[List[int]] = None,
         ratio: bool = False,
         option: Optional[str] = None,
-        option_axis: int = 2,
+        option_axis_dim: str = "spectral_channel",
         chunks: Union[str, Tuple] = "auto",
     ) -> Union[np.ndarray, da.core.Array]:
         """
@@ -581,10 +506,11 @@ class msat_collection:
         grp: if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
         sv_var: grp will be set to SpecFitDiagnostics and sv_var must be one of APrioriState or APosterioriState, and var must be the exact SubStateName of the state vector variable
         extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables
+        extra_id_dim: name of the dimension along which extra_id will be selected
         ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
-        option_axis: the axis along which the stat is applied (remember the variables are transposed when read)
+        option_axis: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         """
         if ids is None:
@@ -592,59 +518,47 @@ class msat_collection:
         else:
             ids = {i: self.ids[i] for i in ids}
         if sv_var is not None and var not in ["APosterioriState", "APrioriState"]:
-            raise Exception(
+            raise MSATError(
                 'var must be one of ["APrioriState","APosterioriState"] when sv_var is given'
             )
         elif sv_var is not None:
             nc_slice = self.get_sv_slice(sv_var)
             grp = "SpecFitDiagnostics"
         else:
-            nc_slice = tuple()
+            nc_slice = slice(None)
+
+        var_path = self.fetch_varpath(var, grp=grp)
+        var_dim_map = self.get_dim_map(var_path)
+        atrack_axis = var_dim_map["atrack"]
         x = []
         for num, i in enumerate(ids.values()):
             if var == "dp":
-                x.append(self.msat_files[i].dp.T)
+                x.append(self.msat_files[i].dp)
             else:
                 if grp is None:
-                    x.append(self.msat_files[i].fetch(var, chunks=chunks).T)
+                    x.append(self.msat_files[i].fetch(var, chunks=chunks))
                 else:
-                    x.append(self.msat_files[i].get_var(var, grp, chunks=chunks)[nc_slice].T)
-        if len(x[0].shape) == 1:
-            axis = 0
-        elif "along_track" in self.msat_files[i].nc_dset.dimensions:
-            if var == "dp":
-                axis = 1
-            else:
-                varpath = self.fetch_varpath(var.lower(), grp=grp)
-                vardim = self.msat_files[i].nc_dset[varpath].dimensions
-                ndim = len(vardim)
-                axis = vardim.index("along_track")
-            if ndim == 2 and axis == 0:
-                axis = 1
-            elif ndim == 2 and axis == 1:
-                axis = 0
-            elif ndim == 3 and axis == 0:
-                axis = 2
-            elif ndim == 3 and axis == 2:
-                axis = 0
-        else:
-            axis = 1
+                    x.append(self.msat_files[i].get_var(var, grp, chunks=chunks)[nc_slice])
 
         if self.use_dask:
-            x = da.concatenate(x, axis=axis).squeeze()
+            x = da.concatenate(x, axis=atrack_axis)
             x[da.greater(x, 1e29)] = np.nan
         else:
-            x = np.concatenate(x, axis=axis).squeeze()
+            x = np.concatenate(x, axis=atrack_axis)
             x[np.greater(x, 1e29)] = np.nan
-        if option:
+        if option is not None:
+            option_axis = var_dim_map[option_axis_dim]
             if self.use_dask:
                 x = getattr(da, option)(x, axis=option_axis)
             else:
                 x = getattr(np, option)(x, axis=option_axis)
-        elif (extra_id is not None) and len(x.shape) == 3:
-            x = x[:, :, extra_id]
-        elif (extra_id is not None) and len(x.shape) == 4:
-            x = x[:, :, extra_id, extra_id]
+        elif (extra_id is not None) and (extra_id_dim is not None):
+            extra_id_dim_axis = var_dim_map[extra_id_dim]
+            x_slices = [slice(None) for i in range(len(x.shape))]
+            x_slices[extra_id_dim_axis] = extra_id
+            x = x[tuple(x_slices)]
+
+        x = x.squeeze()
 
         if ratio:
             if self.use_dask:
@@ -662,10 +576,11 @@ class msat_collection:
         grp: Optional[str] = None,
         sv_var: Optional[str] = None,
         extra_id: Optional[int] = None,
+        extra_id_dim: Optional[str] = None,
         ids: Optional[List[int]] = None,
         ratio: bool = False,
         option: Optional[str] = None,
-        option_axis: int = 2,
+        option_axis_dim: str = "spectral_channel",
         chunks: Union[str, Tuple] = "auto",
         method: str = "cubic",
         res: float = 20,
@@ -679,16 +594,17 @@ class msat_collection:
         grp: if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
         sv_var: grp will be set to SpecFitDiagnostics and sv_var must be one of APrioriState or APosterioriState, and var must be the exact SubStateName of the state vector variable
         extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables
+        extra_id_dim: name of the dimension along which extra_id will be selected
         ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
-        option_axis: the axis along which the stat is applied (remember the variables are transposed when read)
+        option_axis: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         method: griddata interpolation method
         res: grid resolution in meters
         """
         if not self.use_dask:
-            raise Exception("grid_prep needs self.use_dask==True")
+            raise MSATError("grid_prep needs self.use_dask==True")
 
         if ids is None:
             ids = self.ids
@@ -723,9 +639,10 @@ class msat_collection:
                 grp=grp,
                 sv_var=sv_var,
                 extra_id=extra_id,
+                extra_id_dim=extra_id_dim,
                 ids=ids_slice,
                 option=option,
-                option_axis=option_axis,
+                option_axis_dim=option_axis_dim,
                 ratio=ratio,
                 chunks=chunks,
             )
@@ -795,9 +712,10 @@ class msat_collection:
         ylim: Optional[Annotated[Sequence[float], 2]] = None,
         save_path: Optional[str] = None,
         extra_id: Optional[int] = None,
+        extra_id_dim: Optional[str] = None,
         ids: Optional[List[int]] = None,
         option: Optional[str] = None,
-        option_axis: int = 2,
+        option_axis_dim: str = "spectral_channel",
         chunks: Union[str, Tuple] = "auto",
         lon_lim: Optional[Annotated[Sequence[float], 2]] = None,
         lat_lim: Optional[Annotated[Sequence[float], 2]] = None,
@@ -807,6 +725,7 @@ class msat_collection:
         ax: plt.Axes = None,
         res: float = 20,
         scale: float = 1.0,
+        cmap: str = "viridis",
     ) -> None:
         """
         Make a heatmap of the given variable
@@ -816,9 +735,10 @@ class msat_collection:
         ratio: if True, plots the variable divided by its median
         ylim: sets the vertical axis range (in cross track pixel indices)
         extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables and when "option" is None
+        extra_id_dim: name of the dimension along which extra_id will be selected
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std'), for example to plot a heatmap of the maximum radiance
-        option_axis: the axis along which the stat is applied (2 is typically along the spectral dimension, remember the variables are transposed when read)
+        option_axis: the axis along which the stat is applied (from the set of common dimension names: ["xtrack","atrack","xtrack_edge","atrack_edge","lev","lev_edge","corner","spectral_channel","xmx","nsubx"])
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         lon_lim: [min,max] longitudes for the gridding
         lat_lim: [min,max] latitudes for the gridding
@@ -828,6 +748,7 @@ class msat_collection:
         ax: if given, make the plot in the given matplotlib axes object
         res: the resolution (in meters) of the grid with lon_lim and lat_lim are given
         scale: a factor with which the data will be scaled
+        cmap: matplotlib named colormaps (https://matplotlib.org/stable/gallery/color/colormap_reference.html)
         """
         if ids is None:
             ids = self.ids
@@ -851,34 +772,23 @@ class msat_collection:
                 grp=grp,
                 sv_var=sv_var,
                 extra_id=extra_id,
+                extra_id_dim=extra_id_dim,
                 ids=ids,
                 option=option,
-                option_axis=option_axis,
+                option_axis_dim=option_axis_dim,
                 ratio=ratio,
                 chunks=chunks,
             )
             x = x * scale
             if latlon:
-                if self.is_l2:
-                    grp = "Level1"
-                else:
-                    grp = "Geolocation"
                 lat = self.pmesh_prep(
                     "Latitude",
-                    grp=grp,
-                    sv_var=sv_var,
-                    extra_id=extra_id,
                     ids=ids,
-                    ratio=ratio,
                     chunks=chunks,
                 )
                 lon = self.pmesh_prep(
                     "Longitude",
-                    grp=grp,
-                    sv_var=sv_var,
-                    extra_id=extra_id,
                     ids=ids,
-                    ratio=ratio,
                     chunks=chunks,
                 )
         if gridded and self.use_dask:
@@ -890,9 +800,10 @@ class msat_collection:
                 grp=grp,
                 sv_var=sv_var,
                 extra_id=extra_id,
+                extra_id_dim=extra_id_dim,
                 ids=ids,
                 option=option,
-                option_axis=option_axis,
+                option_axis_dim=option_axis_dim,
                 ratio=ratio,
                 chunks=chunks,
                 method=method,
@@ -903,27 +814,27 @@ class msat_collection:
             if save_nc:
                 with ncdf.Dataset(save_nc[0], "r+") as outfile:
                     if "atrack" not in save_nc.dimensions:
-                        outfile.createDimension("atrack", lat_grid.shape([1]))
-                    if "xtrack" not in outfile.dimensions:
                         outfile.createDimension("atrack", lat_grid.shape([0]))
+                    if "xtrack" not in outfile.dimensions:
+                        outfile.createDimension("atrack", lat_grid.shape([1]))
                     if "latitude" not in outfile.variables:
-                        outfile.createVariable("latitude", lat_grid.shape, ("xtrack", "atrack"))
+                        outfile.createVariable("latitude", lat_grid.shape, ("atrack", "xtrack"))
                         outfile["latitude"][:] = lat_grid
                     if "longitude" not in outfile.variables:
-                        outfile.createVariable("longitude", lat_grid.shape, ("xtrack", "atrack"))
+                        outfile.createVariable("longitude", lat_grid.shape, ("atrack", "xtrack"))
                         outfile["longitude"][:] = lon_grid
                     if save_nc[1] not in outfile.variables:
-                        outfile.createVariable(save_nc[1], lat_grid.shape, ("xtrack", "atrack"))
+                        outfile.createVariable(save_nc[1], lat_grid.shape, ("atrack", "xtrack"))
                     outfile[save_nc[1]] = gridded_x
 
             if vminmax is None:
-                m = ax.pcolormesh(lon_grid, lat_grid, gridded_x, cmap="viridis")
+                m = ax.pcolormesh(lon_grid, lat_grid, gridded_x, cmap=cmap)
             else:
                 m = ax.pcolormesh(
                     lon_grid,
                     lat_grid,
                     gridded_x,
-                    cmap="viridis",
+                    cmap=cmap,
                     vmin=vminmax[0],
                     vmax=vminmax[1],
                 )
@@ -933,25 +844,27 @@ class msat_collection:
             if vminmax is None:
                 if latlon:
                     m = ax.pcolormesh(
-                        lon[self.valid_xtrack],
-                        lat[self.valid_xtrack],
-                        x[self.valid_xtrack],
-                        cmap="viridis",
+                        lon[:, self.valid_xtrack],
+                        lat[:, self.valid_xtrack],
+                        x[:, self.valid_xtrack],
+                        cmap=cmap,
                     )
                 else:
-                    m = ax.pcolormesh(x, cmap="viridis")
+                    m = ax.pcolormesh(x[:, self.valid_xtrack], cmap=cmap)
             else:
                 if latlon:
                     m = ax.pcolormesh(
-                        lon[self.valid_xtrack],
-                        lat[self.valid_xtrack],
-                        x[self.valid_xtrack],
-                        cmap="viridis",
+                        lon[:, self.valid_xtrack],
+                        lat[:, self.valid_xtrack],
+                        x[:, self.valid_xtrack],
+                        cmap=cmap,
                         vmin=vminmax[0],
                         vmax=vminmax[1],
                     )
                 else:
-                    m = ax.pcolormesh(x, cmap="viridis", vmin=vminmax[0], vmax=vminmax[1])
+                    m = ax.pcolormesh(
+                        x[:, self.valid_xtrack], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1]
+                    )
 
         if var == "dp":
             lab = "$\Delta P$"
@@ -978,8 +891,8 @@ class msat_collection:
             ax.set_xlabel("Longitude")
             ax.set_ylabel("Latitude")
         else:
-            ax.set_xlabel("along-track index")
-            ax.set_ylabel("cross-track index")
+            ax.set_ylabel("along-track index")
+            ax.set_xlabel("cross-track index")
 
         # disable scientific notations in axis numbers
         ax.get_xaxis().get_major_formatter().set_useOffset(False)

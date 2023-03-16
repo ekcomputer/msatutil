@@ -7,7 +7,7 @@ import netCDF4 as ncdf
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from typing import Optional, Sequence, Tuple, Union, Annotated, List
+from typing import Optional, Sequence, Tuple, Union, Annotated, List, Dict
 from collections import OrderedDict
 from io import StringIO
 import argparse
@@ -32,7 +32,50 @@ class msat_nc:
             raise MSATError(f"Wrong path: {infile}")
         else:
             self.nc_dset = ncdf.Dataset(infile, "r")
+        try:  # this is a try so we can use the same class to read the L1 files
+            sp_slice = self.get_sv_slice("SurfacePressure")
+            if not self.use_dask:
+                self.dp = (
+                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
+                    - self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice]
+                )
+            else:
+                self.dp = da.from_array(
+                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
+                ) - da.from_array(self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice])
+        except Exception:
+            pass
         self.datetimes = None
+        self.is_l2 = "Level1" in self.nc_dset.groups
+
+        # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
+        # use the get_dim_map method to get a mapping of a given variables dimensions that use the dimensions names from the common set
+        # common set: ["one","xtrack","atrack","xtrack_edge","atrack_edge","lev","lev_edge","corner","spectral_channel","xmx","nsubx"]
+        self.dim_name_map = {
+            "one": "one",
+            "o": "one",
+            "imx": "xtrack",
+            "xtrack": "xtrack",
+            "x": "xtrack",
+            "imx_e": "atrack_edge",
+            "jmx": "atrack",
+            "atrack": "atrack",
+            "y": "atrack",
+            "jmx_e": "atrack_edge",
+            "lmx": "lev",
+            "lev": "lev",
+            "lmx_e": "lev_edge",
+            "lev_edge": "lev_edge",
+            "four": "corner",
+            "c": "corner",
+            "corner": "corner",
+            "nv": "corner",
+            "w1": "spectral_channel",
+            "wmx_1": "spectral_channel",
+            "spectral_channel": "spectral_channel",
+            "xmx": "xmx",
+            "nsubx": "nsubx",
+        }
 
     def __enter__(self) -> None:
         return self
@@ -44,7 +87,10 @@ class msat_nc:
         self.nc_dset.close()
 
     def get_var(
-        self, var: str, grp: Optional[str] = None, chunks: Union[str, Tuple] = "auto",
+        self,
+        var: str,
+        grp: Optional[str] = None,
+        chunks: Union[str, Tuple] = "auto",
     ) -> Union[np.ndarray, np.ma.masked_array, da.core.Array]:
         """
         return a variable array from the netcdf file
@@ -52,7 +98,9 @@ class msat_nc:
         grp: complete group name
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         """
-        if var.lower() in ["datetime", "datetimes"]:
+        if var.lower() == "dp":
+            return self.dp
+        elif var.lower() in ["datetime", "datetimes"]:
             return self.datetimes
         elif grp is not None:
             if self.use_dask:
@@ -67,7 +115,7 @@ class msat_nc:
         """
         get the units of the given variable
         var: complete variable name
-        grp: complete group name        
+        grp: complete group name
         """
         if grp:
             nc_var = self.nc_dset[grp][var]
@@ -84,7 +132,7 @@ class msat_nc:
         """
         display the given variable metadata
         var: complete variable name
-        grp: complete group name            
+        grp: complete group name
         """
         if grp:
             print(self.nc_dset[grp][var])
@@ -107,20 +155,27 @@ class msat_nc:
     def show_group(self, grp: str) -> None:
         """
         Show all the variable names and dimensions of a given group
-        grp: complete group name 
+        grp: complete group name
         """
         if self.nc_dset.groups:
             for var in self.nc_dset[grp].variables:
                 print(var, self.nc_dset[grp][var].dimensions)
+
+    def show_sv(self) -> None:
+        """
+        Display the state vector variable names
+        """
+        sv_dict = self.nc_dset["SpecFitDiagnostics"]["APosterioriState"].__dict__
+        for key, val in sv_dict.items():
+            if type(val) == str:
+                val = val.strip()
+            print(f"{key.strip()}: {val}")
 
     def get_sv_slice(self, var: str) -> np.ndarray:
         """
         Get the state vector index for the given variable
         var: complete state vector variable name
         """
-        if self.nc_dset.groups and ("SpecFitDiagnostics" not in self.nc_dset.groups):
-            print('get_sv_slice needs a msat file with a "SpecFitDiagnostics" group')
-            return None
         sv_dict = self.nc_dset["SpecFitDiagnostics"]["APosterioriState"].__dict__
 
         for key, val in sv_dict.items():
@@ -220,12 +275,15 @@ class msat_nc:
 
         return units
 
-    def fetch_varpath(self, key: str, grp: Optional[str] = None) -> str:
+    def fetch_varpath(self, key: str, grp: Optional[str] = None) -> Union[str, None]:
         """
         get the full path to the given variable such that the variable can be selected with self.nc_dset[varpath]
         key: the key you would like to search for
         grp: if given, searches in the given group only
         """
+        key = key.lower()
+        if key == "dp":
+            return "dp"
         if grp is not None:
             for var in self.nc_dset[grp].variables:
                 if key in var.lower():
@@ -241,7 +299,9 @@ class msat_nc:
                         return f"{grp}/{var}"
 
     @staticmethod
-    def nctime_to_pytime(nc_time_var: ncdf.Variable,) -> Union[np.ndarray, np.ma.masked_array]:
+    def nctime_to_pytime(
+        nc_time_var: ncdf.Variable,
+    ) -> Union[np.ndarray, np.ma.masked_array]:
         """
         Convert time in a netCDF variable to an array of Python datetime objects.
         """
@@ -258,5 +318,69 @@ class msat_nc:
             units = nc_time_var.units
 
         return ncdf.num2date(
-            nc_time_var[:], units=units, calendar=calendar, only_use_cftime_datetimes=False,
+            nc_time_var[:],
+            units=units,
+            calendar=calendar,
+            only_use_cftime_datetimes=False,
         )
+
+    def get_dim_map(self, var_path: str) -> Dict[str, int]:
+        """
+        For a given key, use fetch_varpath to inspect the corresponding variable and
+        return a map of its dimension axes {'dim_name':dim_axis}
+        """
+        if var_path.lower() == "dp":
+            if len(self.dp.shape) == 3:
+                var_dim_map = {"one": 0, "atrack": 1, "xtrack": 2}
+            else:
+                var_dim_map = {"atrack": 0, "xtrack": 1}
+        else:
+            var_dims = self.nc_dset[var_path].dimensions
+            var_dim_map = {self.dim_name_map[dim]: var_dims.index(dim) for dim in var_dims}
+
+        return var_dim_map
+
+    def get_valid_xtrack(self) -> slice:
+        """
+        Get the valid cross track indices
+        """
+        if self.is_l2:
+            var_dim_map = self.get_dim_map("Level1/Longitude")
+            atrack_axis = var_dim_map["atrack"]
+            valid_xtrack = np.where(
+                ~np.isnan(
+                    np.nanmedian(self.nc_dset["Level1/Longitude"][:], axis=atrack_axis).squeeze()
+                )
+            )[0]
+        else:
+            var_dim_map = self.get_dim_map("Band1/Radiance")
+            spec_axis = var_dim_map["spectral_channel"]
+            atrack_axis = var_dim_map["atrack"]
+            valid_xtrack = np.where(
+                np.nanmedian(
+                    np.nansum(self.nc_dset["Band1/Radiance"][:], axis=spec_axis), axis=atrack_axis
+                )
+                > 0
+            )[0]
+        valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
+
+        return valid_xtrack_slice
+
+    def get_valid_rad(self) -> Union[slice, None]:
+        """
+        Get the valid radiance indices
+        """
+        rad_var_path = self.fetch_varpath("radiance")
+        if rad_var_path is None:
+            valid_rad_slice = None
+        else:
+            var_dim_map = self.get_dim_map(rad_var_path)
+            xtrack_axis = var_dim_map["xtrack"]
+            atrack_axis = var_dim_map["atrack"]
+            valid_rad = np.where(
+                np.nansum(self.nc_dset[rad_var_path][:], axis=(xtrack_axis, atrack_axis)) > 0
+            )[0]
+
+            valid_rad_slice = slice(valid_rad[0], valid_rad[-1] + 1)
+
+        return valid_rad_slice
