@@ -1,4 +1,12 @@
-from msatutil.msat_interface import *
+from __future__ import annotations
+import os
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+from typing import Optional, Sequence, Tuple, Annotated
+import netCDF4 as ncdf
+
+from msatutil.msat_interface import msat_collection
 
 
 def msat_heatmap(
@@ -11,6 +19,7 @@ def msat_heatmap(
     grey_path: Optional[str] = None,
     save_path: Optional[str] = None,
     extra_id: Optional[int] = None,
+    extra_id_dim: Optional[str] = None,
 ) -> Tuple[plt.Figure, Sequence[plt.Axes], np.ndarray]:
     """
     Make a figure with 2 panels, the top is a greyscale and the bottom is a retrieved variable
@@ -30,7 +39,7 @@ def msat_heatmap(
             curax.set_xlabel("along-track index")
             curax.set_ylabel("cross-track index")
 
-    x = msat.pmesh_prep(var, sv_var=sv_var, extra_id=extra_id)
+    x = msat.pmesh_prep(var, sv_var=sv_var, extra_id=extra_id, extra_id_dim=extra_id_dim)
     if ratio:
         x = x / np.nanmedian(x)
     if vminmax is None:
@@ -96,6 +105,11 @@ def main():
         default=0,
         help="integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables",
     )
+    parser.add_argument(
+        "--extra-id-dim",
+        default="spectral_channel",
+        help="dimension name of dimension where extra_id will be applied",
+    )
     parser.add_argument("--search", default="proxy.nc", help="string pattern to select msat files")
     parser.add_argument(
         "-r",
@@ -104,13 +118,24 @@ def main():
         help="if given, plots the variable divided by its median",
     )
     parser.add_argument(
-        "--vminmax", nargs=2, type=float, default=None, help="min and max values for the colorbar",
+        "--vminmax",
+        nargs=2,
+        type=float,
+        default=None,
+        help="min and max values for the colorbar",
     )
     parser.add_argument(
-        "--ylim", nargs=2, type=float, default=[25, 200], help="sets vertical axis limits",
+        "--ylim",
+        nargs=2,
+        type=float,
+        default=[25, 200],
+        help="sets vertical axis limits",
     )
     parser.add_argument(
-        "-s", "--save-path", default="", help="full filepath to save the plot (includes filename)",
+        "-s",
+        "--save-path",
+        default="",
+        help="full filepath to save the plot (includes filename)",
     )
     parser.add_argument(
         "--use-dask", action="store_true", help="if given, use dask to handle the data"
@@ -148,6 +173,7 @@ def main():
         grey_path=args.grey_path,
         save_path=args.save_path,
         extra_id=args.extra_id,
+        extra_id_dim=args.extra_id_dim,
     )
 
 

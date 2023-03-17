@@ -510,7 +510,7 @@ class msat_collection:
         ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
-        option_axis: the axis along which the stat is applied
+        option_axis_dim: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         """
         if ids is None:
@@ -598,7 +598,7 @@ class msat_collection:
         ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
-        option_axis: the axis along which the stat is applied
+        option_axis_dim: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         method: griddata interpolation method
         res: grid resolution in meters
@@ -732,13 +732,14 @@ class msat_collection:
         var: key contained in the variable to search (uses msat_nc fetch method)
         grp: if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
         vminmax: min and max value to be shown with the colorbar
+        latlon: if True, make the plot on latitude/longitude instead of xtrack/atrack
         ratio: if True, plots the variable divided by its median
         ylim: sets the vertical axis range (in cross track pixel indices)
         extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables and when "option" is None
         extra_id_dim: name of the dimension along which extra_id will be selected
         ratio: if True, return the variable divided by its median
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std'), for example to plot a heatmap of the maximum radiance
-        option_axis: the axis along which the stat is applied (from the set of common dimension names: ["xtrack","atrack","xtrack_edge","atrack_edge","lev","lev_edge","corner","spectral_channel","xmx","nsubx"])
+        option_axis_dim: the axis along which the stat is applied (from the set of common dimension names: ["xtrack","atrack","xtrack_edge","atrack_edge","lev","lev_edge","corner","spectral_channel","xmx","nsubx"])
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         lon_lim: [min,max] longitudes for the gridding
         lat_lim: [min,max] latitudes for the gridding
