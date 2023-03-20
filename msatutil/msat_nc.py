@@ -359,12 +359,10 @@ class msat_nc:
             var_dim_map = self.get_dim_map("Band1/Radiance")
             spec_axis = var_dim_map["spectral_channel"]
             atrack_axis = var_dim_map["atrack"]
-            valid_xtrack = np.where(
-                np.nanmedian(
-                    np.nansum(self.nc_dset["Band1/Radiance"][:], axis=spec_axis), axis=atrack_axis
-                )
-                > 0
-            )[0]
+            xtrack_axis = var_dim_map["xtrack"]
+            rad = self.nc_dset["Band1/Radiance"][:]
+            rad = rad.transpose(atrack_axis, xtrack_axis, spec_axis)
+            valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 0)[0]
         valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
 
         return valid_xtrack_slice
