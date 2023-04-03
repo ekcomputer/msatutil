@@ -47,6 +47,7 @@ class msat_nc:
             pass
         self.datetimes = None
         self.is_l2 = "Level1" in self.nc_dset.groups
+        self.varpath_list = None
 
         # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
         # use the get_dim_map method to get a mapping of a given variables dimensions that use the dimensions names from the common set
@@ -363,7 +364,11 @@ class msat_nc:
             rad = self.nc_dset["Band1/Radiance"][:]
             rad = rad.transpose(atrack_axis, xtrack_axis, spec_axis)
             valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 0)[0]
-        valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
+        if len(valid_xtrack)==0:
+            print(self.nc_dset.filepath(), " has no valid xtrack")
+            valid_xtrack_slice = slice(None)
+        else:
+            valid_xtrack_slice = slice(valid_xtrack[0], valid_xtrack[-1] + 1)
 
         return valid_xtrack_slice
 
@@ -371,7 +376,13 @@ class msat_nc:
         """
         Get the valid radiance indices
         """
-        rad_var_path = self.fetch_varpath("radiance")
+        if self.is_l2 and self.has_var("RTM_Band1/Radiance_I"):
+            rad_var_path = "RTM_Band1/Radiance_I"
+        elif self.is_l2:
+            rad_var_path = None
+        elif not self.is_l2:
+            rad_var_path = "Band1/Radiance"
+            
         if rad_var_path is None:
             valid_rad_slice = None
         else:
@@ -382,6 +393,37 @@ class msat_nc:
                 np.nansum(self.nc_dset[rad_var_path][:], axis=(xtrack_axis, atrack_axis)) > 0
             )[0]
 
-            valid_rad_slice = slice(valid_rad[0], valid_rad[-1] + 1)
+            if valid_rad.size != 0:
+                valid_rad_slice = slice(valid_rad[0], valid_rad[-1] + 1)
+            else:
+                print(self.nc_dset.filepath(), " has no valid radiances")
+                valid_rad_slice = None
 
         return valid_rad_slice
+
+    def get_var_paths(self) -> List[str]:
+        """
+        Get a list of all the full variable paths in the netcdf file
+        """
+
+        if self.varpath_list is not None:
+            return self.varpath_list
+
+        varpath_list = []
+
+        for v in self.nc_dset.variables:
+            varpath_list += [v]
+        for g in self.nc_dset.groups:
+            for v in self.nc_dset[g].variables:
+                varpath_list += [f"{g}/{v}"]
+
+        self.varpath_list = varpath_list
+
+        return varpath_list
+
+    def has_var(self, var) -> bool:
+        """
+        Check if the netcdf file has the given variable
+        """
+        varpath_list = self.get_var_paths()
+        return var in varpath_list
