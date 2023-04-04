@@ -32,19 +32,8 @@ class msat_nc:
             raise MSATError(f"Wrong path: {infile}")
         else:
             self.nc_dset = ncdf.Dataset(infile, "r")
-        try:  # this is a try so we can use the same class to read the L1 files
-            sp_slice = self.get_sv_slice("SurfacePressure")
-            if not self.use_dask:
-                self.dp = (
-                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
-                    - self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice]
-                )
-            else:
-                self.dp = da.from_array(
-                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
-                ) - da.from_array(self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice])
-        except Exception:
-            pass
+
+        self.dp = None
         self.datetimes = None
         self.is_l2 = "Level1" in self.nc_dset.groups
         self.varpath_list = None
@@ -89,6 +78,28 @@ class msat_nc:
 
     def close(self) -> None:
         self.nc_dset.close()
+
+    def read_dp(self) -> None:
+        """
+        Getting the retrieved minus prior surface pressure in self.dp
+        """
+        try:  # this is a try so we can use the same class to read the L1 files
+            if "o2dp_fit_diagnostics" in self.nc_dset.groups:
+                self.dp = self.nc_dset["o2dp_fit_diagnostics"]["bias_corrected_delta_pressure"][:]
+                return
+            else:
+                sp_slice = self.get_sv_slice("SurfacePressure")
+            if not self.use_dask:
+                self.dp = (
+                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
+                    - self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice]
+                )
+            else:
+                self.dp = da.from_array(
+                    self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
+                ) - da.from_array(self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice])
+        except Exception:
+            pass
 
     def get_var(
         self,
@@ -364,7 +375,7 @@ class msat_nc:
             rad = self.nc_dset["Band1/Radiance"][:]
             rad = rad.transpose(atrack_axis, xtrack_axis, spec_axis)
             valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 0)[0]
-        if len(valid_xtrack)==0:
+        if len(valid_xtrack) == 0:
             print(self.nc_dset.filepath(), " has no valid xtrack")
             valid_xtrack_slice = slice(None)
         else:
@@ -382,7 +393,7 @@ class msat_nc:
             rad_var_path = None
         elif not self.is_l2:
             rad_var_path = "Band1/Radiance"
-            
+
         if rad_var_path is None:
             valid_rad_slice = None
         else:

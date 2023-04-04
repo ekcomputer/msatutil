@@ -127,6 +127,8 @@ class msat_file(msat_nc):
         color: the color of the bars
         """
         if var == "dp":
+            if self.dp is None:
+                self.read_dp()
             flat_var = self.dp.flatten()
         else:
             flat_var = self.nc_dset[grp][var][:].flatten()
@@ -517,7 +519,7 @@ class msat_collection:
             ids = self.ids
         else:
             ids = {i: self.ids[i] for i in ids}
-        if sv_var is not None and var not in ["APosterioriState", "APrioriState"]:
+        if (sv_var is not None) and (var not in ["APosterioriState", "APrioriState"]):
             raise MSATError(
                 'var must be one of ["APrioriState","APosterioriState"] when sv_var is given'
             )
@@ -526,6 +528,9 @@ class msat_collection:
             grp = "SpecFitDiagnostics"
         else:
             nc_slice = slice(None)
+
+        if var == "dp" and self.dp is None:
+            self.read_dp()
 
         var_path = self.fetch_varpath(var, grp=grp)
         var_dim_map = self.get_dim_map(var_path)
@@ -970,6 +975,13 @@ class msat_collection:
         if hasattr(self, "msat_files"):
             for msat_file in self.msat_files.values():
                 msat_file.use_dask = use_dask
+
+    def read_dp(self) -> None:
+        """
+        Fills self.dp for all the files in the collection
+        """
+        for f, v in self.msat_files:
+            v.read_dp()
 
 
 def main():
