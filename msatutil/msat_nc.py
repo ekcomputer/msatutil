@@ -35,7 +35,8 @@ class msat_nc:
 
         self.dp = None
         self.datetimes = None
-        self.is_l2 = "Level1" in self.nc_dset.groups
+        self.is_postproc = "product" in self.nc_dset.groups
+        self.is_l2 = ("Level1" in self.nc_dset.groups) or self.is_postproc
         self.varpath_list = None
 
         # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
@@ -59,6 +60,7 @@ class msat_nc:
             "level": "lev",
             "lmx_e": "lev_edge",
             "lev_edge": "lev_edge",
+            "vertices": "corner",
             "four": "corner",
             "c": "corner",
             "corner": "corner",
@@ -359,12 +361,17 @@ class msat_nc:
         """
         Get the valid cross track indices
         """
+        if self.is_postproc:
+            longitude_varpath = "geolocation/longitude"
+        elif self.is_l2:
+            longitude_varpath = "Level1/Longitude"
+            var_dim_map = self.get_dim_map("geolocation/Longitude")
+
         if self.is_l2:
-            var_dim_map = self.get_dim_map("Level1/Longitude")
             atrack_axis = var_dim_map["atrack"]
             valid_xtrack = np.where(
                 ~np.isnan(
-                    np.nanmedian(self.nc_dset["Level1/Longitude"][:], axis=atrack_axis).squeeze()
+                    np.nanmedian(self.nc_dset[longitude_varpath][:], axis=atrack_axis).squeeze()
                 )
             )[0]
         else:
@@ -387,6 +394,8 @@ class msat_nc:
         """
         Get the valid radiance indices
         """
+        if self.is_postproc:
+            return None
         if self.is_l2 and self.has_var("RTM_Band1/Radiance_I"):
             rad_var_path = "RTM_Band1/Radiance_I"
         elif self.is_l2:
