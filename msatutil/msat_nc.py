@@ -365,9 +365,9 @@ class msat_nc:
             longitude_varpath = "geolocation/longitude"
         elif self.is_l2:
             longitude_varpath = "Level1/Longitude"
-            var_dim_map = self.get_dim_map("geolocation/Longitude")
 
         if self.is_l2:
+            var_dim_map = self.get_dim_map(longitude_varpath)
             atrack_axis = var_dim_map["atrack"]
             valid_xtrack = np.where(
                 ~np.isnan(
