@@ -980,7 +980,7 @@ class msat_collection:
         """
         Fills self.dp for all the files in the collection
         """
-        for f, v in self.msat_files:
+        for f, v in self.msat_files.items():
             v.read_dp()
 
 
