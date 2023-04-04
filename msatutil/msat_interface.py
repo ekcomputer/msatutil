@@ -529,7 +529,7 @@ class msat_collection:
         else:
             nc_slice = slice(None)
 
-        if var == "dp" and self.dp is None:
+        if var == "dp" and self.msat_files[self.ids[0]].dp is None:
             self.read_dp()
 
         var_path = self.fetch_varpath(var, grp=grp)
