@@ -99,12 +99,16 @@ def timeit(func):
     return wrapper
 
 
-def get_msat(indir, srchstr="Methane*.nc"):
+def get_msat(
+    indir,
+    date_range: Optional[Annotated[Sequence[datetime.datetime], 2]] = None,
+    srchstr="Methane*.nc",
+):
     """
     Function to get the L1B or L2 files under indir into a msat_collection object
     """
     flist = glob.glob(os.path.join(indir, srchstr))
-    return msat_collection(flist, use_dask=True)
+    return msat_collection(flist, date_range=date_range, use_dask=True)
 
 
 class msat_file(msat_nc):
