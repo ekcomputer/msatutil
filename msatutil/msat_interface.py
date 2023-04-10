@@ -18,6 +18,7 @@ from scipy.interpolate import griddata
 from scipy.spatial import Delaunay
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import pickle
+from tqdm import tqdm
 
 
 def meters_to_lat_lon(x: float, lat: float) -> float:
@@ -705,7 +706,24 @@ class msat_collection:
 
         return lon_grid, lat_grid, x_grid_avg
 
-    @timeit
+    def heatmap_loop(self, id_chunk: int, ax: Optional[plt.Axes] = None, **kwargs):
+        """
+        Call heatmap in a loop over self.ids
+
+        id_chunk (int): self.ids will be divided into a list a id_chunk successive chunks
+        ax (Optional[plt.Axes]): figure artist
+        """
+        chunked_ids = list(chunked(list(self.ids.keys()), id_chunk))
+        if ax is None:
+            self.init_plot(1)
+            fig, ax = self.fig, self.ax
+            fig.set_size_inches(8, 5)
+        kwargs["ax"] = ax
+        for ids in tqdm(chunked_ids, total=len(chunked_ids)):
+            kwargs["ids"] = ids
+            self.heatmap(**kwargs)
+
+    # @timeit
     def heatmap(
         self,
         var: str,
@@ -772,6 +790,9 @@ class msat_collection:
 
         gridded = (lon_lim is not None) and (lat_lim is not None)
 
+        if gridded and not self.use_dask:
+            raise MSATError("/!\\ the gridded argument only works when self.use_dask is True")
+
         if not gridded:
             x = self.pmesh_prep(
                 var,
@@ -797,7 +818,33 @@ class msat_collection:
                     ids=ids,
                     chunks=chunks,
                 )
-        if gridded and self.use_dask:
+
+            if vminmax is None:
+                if latlon:
+                    m = ax.pcolormesh(
+                        lon[:, self.valid_xtrack],
+                        lat[:, self.valid_xtrack],
+                        x[:, self.valid_xtrack],
+                        cmap=cmap,
+                    )
+                else:
+                    m = ax.pcolormesh(x[:, self.valid_xtrack], cmap=cmap)
+            else:
+                if latlon:
+                    m = ax.pcolormesh(
+                        lon[:, self.valid_xtrack],
+                        lat[:, self.valid_xtrack],
+                        x[:, self.valid_xtrack],
+                        cmap=cmap,
+                        vmin=vminmax[0],
+                        vmax=vminmax[1],
+                    )
+                else:
+                    m = ax.pcolormesh(
+                        x[:, self.valid_xtrack], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1]
+                    )
+            # end of if gridded
+        elif gridded:
             lon_grid, lat_grid, gridded_x = self.grid_prep(
                 var,
                 lon_lim,
@@ -844,34 +891,9 @@ class msat_collection:
                     vmin=vminmax[0],
                     vmax=vminmax[1],
                 )
-        else:
-            if gridded:
-                print("/!\\ the gridded argument only works when self.use_dask is True")
-            if vminmax is None:
-                if latlon:
-                    m = ax.pcolormesh(
-                        lon[:, self.valid_xtrack],
-                        lat[:, self.valid_xtrack],
-                        x[:, self.valid_xtrack],
-                        cmap=cmap,
-                    )
-                else:
-                    m = ax.pcolormesh(x[:, self.valid_xtrack], cmap=cmap)
-            else:
-                if latlon:
-                    m = ax.pcolormesh(
-                        lon[:, self.valid_xtrack],
-                        lat[:, self.valid_xtrack],
-                        x[:, self.valid_xtrack],
-                        cmap=cmap,
-                        vmin=vminmax[0],
-                        vmax=vminmax[1],
-                    )
-                else:
-                    m = ax.pcolormesh(
-                        x[:, self.valid_xtrack], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1]
-                    )
+        # end of elif gridded
 
+        # General plot layout
         if var == "dp":
             lab = "$\Delta P$"
         elif sv_var:
@@ -886,7 +908,8 @@ class msat_collection:
         if option:
             lab = f"{option} {lab}"
 
-        plt.colorbar(m, label=lab, ax=ax)
+        if len(plt.gcf().axes) == 1:
+            plt.colorbar(m, label=lab, ax=ax)
 
         if self.dates is not None:
             dates = sorted([self.dates[i] for i in ids])
