@@ -1,9 +1,10 @@
 import os
 import argparse
-from pylab import *
+import pylab as plt
 from typing import Optional
-from netCDF4 import Dataset
 import warnings
+import numpy as np
+from msat_nc import msat_nc
 
 
 def check_granule_radiance(
@@ -18,52 +19,53 @@ def check_granule_radiance(
     save_path: full path to the output directory where figures will be saved
     """
 
-    with Dataset(l1_infile, "r") as l1:
-        radiance = l1["Band1/Radiance"][:]
-        if "w1" in l1.dimensions:
-            nalong = l1.dimensions["y"].size
-            radiance = radiance.transpose(1, 2, 0)
-        else:
-            nalong = l1.dimensions["along_track"].size
-
-    with warnings.catch_warnings():
+    with warnings.catch_warnings(), msat_nc(l1_infile, use_dask=True) as l1:
         warnings.simplefilter("ignore")
-        rad_across_mean = np.nanmean(
-            radiance, axis=(0, 2)
-        )  # squish the radiance to get an array with across_track size
-        valid_across_ids = np.where(~np.isnan(rad_across_mean))[
-            0
-        ]  # get the valid across track indices
-        std_norm_rad = np.nanstd(radiance, axis=2, ddof=1) / np.nanmax(radiance, axis=2)
+
+        radiance = l1.get_var("Radiance", grp="Band1").compute()
+        rad_dims = l1.get_dim_map("Band1/Radiance")
+        atrack_axis = rad_dims["atrack"]
+        xtrack_axis = rad_dims["xtrack"]
+        spec_axis = rad_dims["spectral_channel"]
+
+        rad_slice = [slice(None) for i in range(3)]
+        rad_slice[xtrack_axis] = l1.get_valid_xtrack()
+        rad_slice[atrack_axis] = slice(0, 101)
+        radiance = radiance[tuple(rad_slice)]
+
+        std_norm_rad = np.nanstd(radiance, axis=spec_axis, ddof=1) / np.nanmax(
+            radiance, axis=spec_axis
+        )
 
     bad_ids = np.where(std_norm_rad < threshold)
 
     flat_std_norm_rad = std_norm_rad.flatten()
 
-    plot(flat_std_norm_rad, marker="o", linewidth=0)
-    title("Standard deviation of normalized radiances")
-    xlabel("pixel index")
+    plt.plot(flat_std_norm_rad, marker="o", linewidth=0)
+    plt.title("Standard deviation of normalized radiances")
+    plt.xlabel("pixel index")
     if save_path is not None:
         save_name = os.path.join(
             save_path, os.path.basename(l1_infile).replace(".nc", "_std_norm_rad.png")
         )
-        gcf().savefig(save_name)
+        plt.gcf().savefig(save_name)
     else:
-        show()
-    clf()
+        plt.show()
+    plt.clf()
     if len(bad_ids):
         for i, j in zip(bad_ids[0], bad_ids[1]):
-            plot(radiance[i, j], label=f"along_index: {i}; across_index: {j}")
-        legend()
-        xlabel("spectral index")
-        ylabel("Radiance")
+            plt.plot(radiance[i, j], label=f"along_index: {i}; across_index: {j}")
+        plt.legend()
+        plt.xlabel("spectral index")
+        plt.ylabel("Radiance")
         if save_path is not None:
             save_name = os.path.join(
-                save_path, os.path.basename(l1_infile).replace(".nc", "_bad_spectra.png"),
+                save_path,
+                os.path.basename(l1_infile).replace(".nc", "_bad_spectra.png"),
             )
-            gcf().savefig(save_name)
+            plt.gcf().savefig(save_name)
         else:
-            show()
+            plt.show()
 
 
 def main():
@@ -87,7 +89,7 @@ def main():
     )
     args = parser.parse_args()
 
-    check_granule_radiances(args.l1_infile, threshold=args.threshold, save_path=args.save_path)
+    check_granule_radiance(args.l1_infile, threshold=args.threshold, save_path=args.save_path)
 
 
 if __name__ == "__main__":
