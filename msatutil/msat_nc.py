@@ -70,6 +70,14 @@ class msat_nc:
             "spectral_channel": "spectral_channel",
             "xmx": "xmx",
             "nsubx": "nsubx",
+            "p1": "one",
+            "p2": "two",
+            "p3": "three",
+        }
+
+        self.dim_size_map = {
+            self.dim_name_map[dim]: dim_item.size
+            for dim, dim_item in self.nc_dset.dimensions.items()
         }
 
     def __enter__(self) -> None:

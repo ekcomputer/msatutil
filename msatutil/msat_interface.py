@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import argparse
 from msatutil.msat_nc import msat_nc, MSATError
 from collections import OrderedDict
-from typing import Optional, Sequence, Tuple, Union, Annotated, List
+from typing import Optional, Sequence, Tuple, Union, Annotated, List, Dict
 import dask
 import dask.array as da
 import time
@@ -277,23 +277,34 @@ class msat_collection:
         self.set_use_dask(use_dask)
         file_list = np.array(file_list)
         try:
-            dates = np.array(
+            start_dates = np.array(
                 [
                     datetime.strptime(os.path.basename(file_path).split("_")[3], "%Y%m%dT%H%M%S")
                     for file_path in file_list
                 ]
             )
-            sort_ids = np.argsort(dates)
+            end_dates = np.array(
+                [
+                    datetime.strptime(os.path.basename(file_path).split("_")[4], "%Y%m%dT%H%M%S")
+                    for file_path in file_list
+                ]
+            )
+            sort_ids = np.argsort(start_dates)
             file_list = file_list[sort_ids]
-            dates = dates[sort_ids]
+            start_dates = start_dates[sort_ids]
+            end_dates = end_dates[sort_ids]
 
             if date_range:
-                file_list = file_list[(dates > date_range[0]) & (dates < date_range[1])]
-                dates = dates[(dates > date_range[0]) & (dates < date_range[1])]
-            self.dates = dates
+                file_list = file_list[(start_dates > date_range[0]) & (start_dates < date_range[1])]
+                start_dates = start_dates[
+                    (start_dates > date_range[0]) & (start_dates < date_range[1])
+                ]
+            self.start_dates = start_dates
+            self.end_dates = end_dates
         except (ValueError, IndexError):
             print("/!\\ The file names do not have the typical methaneair format")
-            self.dates = None
+            self.start_dates = None
+            self.end_dates = None
 
         self.file_paths = file_list
         self.file_names = [os.path.basename(msat_file) for msat_file in file_list]
@@ -309,6 +320,7 @@ class msat_collection:
         self.is_l2 = self.msat_files[self.ids[0]].is_l2
         self.is_postproc = self.msat_files[self.ids[0]].is_postproc
         self.valid_xtrack = self.get_valid_xtrack()
+        self.dim_size_map = self.msat_files[self.ids[0]].dim_size_map
         # when using self.get_dim_map(var_path), the result maps dimensions to dimension axis using the common set of dimensions names common_dim_set
         self.common_dim_set = [
             "one",
@@ -346,7 +358,7 @@ class msat_collection:
         """
         return self.msat_files[self.ids[0]].get_valid_rad()
 
-    def get_dim_map(self, var_path: str):
+    def get_dim_map(self, var_path: str) -> Dict[str, str]:
         """
         Get the dimension map of the given variable
         """
@@ -363,7 +375,9 @@ class msat_collection:
         """
 
         if date_range is not None:
-            ids = np.where((self.dates >= date_range[0]) & (self.dates < date_range[1]))[0]
+            ids = np.where(
+                (self.start_dates >= date_range[0]) & (self.start_dates < date_range[1])
+            )[0]
 
         return msat_collection([self.file_paths[i] for i in ids], use_dask=use_dask)
 
@@ -915,10 +929,11 @@ class msat_collection:
         if len(plt.gcf().axes) == 1:
             plt.colorbar(m, label=lab, ax=ax)
 
-        if self.dates is not None:
-            dates = sorted([self.dates[i] for i in ids])
+        if self.start_dates is not None:
+            start_dates = sorted([self.start_dates[i] for i in ids])
+            end_dates = sorted([self.end_dates[i] for i in ids])
             ax.set_title(
-                f"{datetime.strftime(dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(dates[-1],'%Y%m%dT%H%M%S')}"
+                f"{datetime.strftime(start_dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(end_dates[-1],'%Y%m%dT%H%M%S')}"
             )
         if gridded or latlon:
             ax.set_xlabel("Longitude")
