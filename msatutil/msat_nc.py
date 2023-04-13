@@ -1,17 +1,8 @@
 from __future__ import annotations
 import os
-import sys
 import numpy as np
-import pandas as pd
 import netCDF4 as ncdf
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from typing import Optional, Sequence, Tuple, Union, Annotated, List, Dict
-from collections import OrderedDict
-from io import StringIO
-import argparse
-import dask
+from typing import Optional, Tuple, Union, List, Dict
 import dask.array as da
 
 
@@ -50,14 +41,17 @@ class msat_nc:
             "across_track": "xtrack",
             "x": "xtrack",
             "imx_e": "xtrack_edge",
+            "xtrack_edge": "xtrack_edge",
             "jmx": "atrack",
             "atrack": "atrack",
             "along_track": "atrack",
             "y": "atrack",
             "jmx_e": "atrack_edge",
+            "atrack_edge": "atrack_edge",
             "lmx": "lev",
             "lev": "lev",
             "level": "lev",
+            "levels": "lev",
             "lmx_e": "lev_edge",
             "lev_edge": "lev_edge",
             "vertices": "corner",
