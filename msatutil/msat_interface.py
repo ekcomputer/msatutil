@@ -317,7 +317,9 @@ class msat_collection:
         )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
+        self.is_l1 = self.msat_files[self.ids[0]].is_l1
         self.is_l2 = self.msat_files[self.ids[0]].is_l2
+        self.is_l2_met = self.msat_files[self.ids[0]].is_l2_met
         self.is_postproc = self.msat_files[self.ids[0]].is_postproc
         self.valid_xtrack = self.get_valid_xtrack()
         self.dim_size_map = self.msat_files[self.ids[0]].dim_size_map

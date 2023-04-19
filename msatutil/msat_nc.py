@@ -27,7 +27,9 @@ class msat_nc:
         self.dp = None
         self.datetimes = None
         self.is_postproc = "product" in self.nc_dset.groups
-        self.is_l2 = ("Level1" in self.nc_dset.groups) or self.is_postproc
+        self.is_l2_met = "Surface_Band1" in self.nc_dset.groups
+        self.is_l2 = not self.is_l2_met and (("Level1" in self.nc_dset.groups) or self.is_postproc)
+        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc]
         self.varpath_list = None
 
         # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
@@ -52,8 +54,10 @@ class msat_nc:
             "lev": "lev",
             "level": "lev",
             "levels": "lev",
+            "z": "lev",
             "lmx_e": "lev_edge",
             "lev_edge": "lev_edge",
+            "ze": "lev_edge",
             "vertices": "corner",
             "four": "corner",
             "c": "corner",
@@ -67,6 +71,9 @@ class msat_nc:
             "p1": "one",
             "p2": "two",
             "p3": "three",
+            "w1_alb": "alb_wvl",
+            "k1_alb": "alb_kernel",
+            "p1_alb": "alb_poly",
         }
 
         self.dim_size_map = {
@@ -363,6 +370,9 @@ class msat_nc:
         """
         Get the valid cross track indices
         """
+        if self.is_l2_met:
+            return slice(None)
+
         if self.is_postproc:
             longitude_varpath = "geolocation/longitude"
         elif self.is_l2:
