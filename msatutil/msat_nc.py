@@ -74,6 +74,9 @@ class msat_nc:
             "w1_alb": "alb_wvl",
             "k1_alb": "alb_kernel",
             "p1_alb": "alb_poly",
+            "w2_alb": "alb_wvl",
+            "k2_alb": "alb_kernel",
+            "p2_alb": "alb_poly",
         }
 
         self.dim_size_map = {
