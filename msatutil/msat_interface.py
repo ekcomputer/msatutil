@@ -522,6 +522,7 @@ class msat_collection:
         option: Optional[str] = None,
         option_axis_dim: str = "spectral_channel",
         chunks: Union[str, Tuple] = "auto",
+        set_nan: Optional[float] = None,
     ) -> Union[np.ndarray, da.core.Array]:
         """
         get a variable ready to plot with plt.pcolormesh(var)
@@ -535,6 +536,7 @@ class msat_collection:
         option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
         option_axis_dim: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
+        set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
         """
         if ids is None:
             ids = self.ids
@@ -586,6 +588,9 @@ class msat_collection:
 
         x = x.squeeze()
 
+        if set_nan is not None:
+            x[x == set_nan] = np.nan
+
         if ratio:
             if self.use_dask:
                 x = x / da.nanmedian(x)
@@ -610,6 +615,7 @@ class msat_collection:
         chunks: Union[str, Tuple] = "auto",
         method: str = "cubic",
         res: float = 20,
+        set_nan: Optional[float] = None,
     ) -> da.core.Array:
         """
         get a variable ready to plot with plt.pcolormesh(lon_grid,lat_grid,x_grid_avg)
@@ -628,6 +634,7 @@ class msat_collection:
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         method: griddata interpolation method
         res: grid resolution in meters
+        set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
         """
         if not self.use_dask:
             raise MSATError("grid_prep needs self.use_dask==True")
@@ -671,6 +678,7 @@ class msat_collection:
                 option_axis_dim=option_axis_dim,
                 ratio=ratio,
                 chunks=chunks,
+                set_nan=set_nan,
             )
             lat = self.pmesh_prep("Latitude", ids=ids_slice, chunks=chunks)
             lon = self.pmesh_prep("Longitude", ids=ids_slice, chunks=chunks)
@@ -769,6 +777,7 @@ class msat_collection:
         res: float = 20,
         scale: float = 1.0,
         cmap: str = "viridis",
+        set_nan: Optional[float] = None,
     ) -> None:
         """
         Make a heatmap of the given variable
@@ -793,6 +802,7 @@ class msat_collection:
         res: the resolution (in meters) of the grid with lon_lim and lat_lim are given
         scale: a factor with which the data will be scaled
         cmap: matplotlib named colormaps (https://matplotlib.org/stable/gallery/color/colormap_reference.html)
+        set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
         """
         if ids is None:
             ids = self.ids
@@ -825,6 +835,7 @@ class msat_collection:
                 option_axis_dim=option_axis_dim,
                 ratio=ratio,
                 chunks=chunks,
+                set_nan=set_nan,
             )
             x = x * scale
             if latlon:
@@ -863,7 +874,7 @@ class msat_collection:
                     m = ax.pcolormesh(
                         x[:, self.valid_xtrack], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1]
                     )
-            # end of if gridded
+            # end of if not gridded
         elif gridded:
             lon_grid, lat_grid, gridded_x = self.grid_prep(
                 var,
@@ -881,6 +892,7 @@ class msat_collection:
                 chunks=chunks,
                 method=method,
                 res=res,
+                set_nan=set_nan,
             )
             gridded_x = gridded_x * scale
 
