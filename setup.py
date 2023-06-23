@@ -15,7 +15,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.9",
     ],
-    install_requires=["dask", "netcdf4", "matplotlib", "pandas", "scipy",],
+    install_requires=["dask", "netcdf4", "matplotlib", "pandas", "scipy", "tqdm"],
     packages=find_packages(),
     include_package_data=True,
     license="MIT",
