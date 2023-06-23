@@ -71,6 +71,7 @@ class msat_nc:
             "p1": "one",
             "p2": "two",
             "p3": "three",
+            "eci": "three",
             "w1_alb": "alb_wvl",
             "k1_alb": "alb_kernel",
             "p1_alb": "alb_poly",
