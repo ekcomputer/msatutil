@@ -80,16 +80,17 @@ def compare_heatmaps(
             if latlon:
                 curax.set_ylabel("Latitude")
             else:
-                curax.set_ylabel("cross-track index")
+                curax.set_ylabel("along-track index")
     if gridded:
         ax["lower left"].set_xlabel("Longitude")
     else:
         if latlon:
             ax["lower left"].set_xlabel("Longitude")
         else:
-            ax["lower left"].set_xlabel("along-track index")
+            ax["lower left"].set_xlabel("across-track index")
+
     fig.suptitle(
-        f"{datetime.strftime(msat_1.dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(msat_1.dates[-1],'%Y%m%dT%H%M%S')}"
+        f"{datetime.strftime(msat_1.start_dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(msat_1.end_dates[-1],'%Y%m%dT%H%M%S')}"
     )
 
     # make the heatmaps
