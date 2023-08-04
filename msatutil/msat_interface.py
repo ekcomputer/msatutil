@@ -279,13 +279,17 @@ class msat_collection:
         try:
             start_dates = np.array(
                 [
-                    datetime.strptime(os.path.basename(file_path).split("_")[3], "%Y%m%dT%H%M%S")
+                    datetime.strptime(
+                        os.path.basename(file_path).strip(".nc").split("_")[3], "%Y%m%dT%H%M%S"
+                    )
                     for file_path in file_list
                 ]
             )
             end_dates = np.array(
                 [
-                    datetime.strptime(os.path.basename(file_path).split("_")[4], "%Y%m%dT%H%M%S")
+                    datetime.strptime(
+                        os.path.basename(file_path).strip(".nc").split("_")[4], "%Y%m%dT%H%M%S"
+                    )
                     for file_path in file_list
                 ]
             )
