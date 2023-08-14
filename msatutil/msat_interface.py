@@ -305,6 +305,7 @@ class msat_collection:
             "spectral_channel",
             "xmx",
             "nsubx",
+            "iter_x",
         ]
 
     def __enter__(self) -> None:

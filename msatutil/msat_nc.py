@@ -78,6 +78,7 @@ class msat_nc:
             "w2_alb": "alb_wvl",
             "k2_alb": "alb_kernel",
             "p2_alb": "alb_poly",
+            "iter_x": "iter_x",
         }
 
         self.dim_size_map = {
@@ -211,10 +212,10 @@ class msat_nc:
         for key, val in sv_dict.items():
             if key.startswith("SubStateName") and val.strip() == var:
                 num = int(key.split("_")[-1]) - 1
-                slice = np.arange(sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num])
+                sv_slice = slice(sv_dict["SubState_Idx0"][num] - 1, sv_dict["SubState_Idxf"][num])
                 break
 
-        return slice
+        return sv_slice
 
     def search(self, key: str) -> None:
         """
