@@ -19,6 +19,7 @@ from scipy.spatial import Delaunay
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import pickle
 from tqdm import tqdm
+from msatutil.make_hist import make_hist
 
 
 def meters_to_lat_lon(x: float, lat: float) -> float:
@@ -119,42 +120,6 @@ class msat_file(msat_nc):
 
     def __init__(self, msat_file: str, use_dask: bool = False) -> None:
         super().__init__(msat_file, use_dask=use_dask)
-
-    def hist(
-        self, ax: plt.Axes, grp: str, var: str, label: str, color: Optional[str] = None
-    ) -> None:
-        """
-        Plot a histogram of the given variable
-        ax: matplotlib axes object
-        grp: complete group name
-        var: complete variable name
-        label: horizontal axis label
-        color: the color of the bars
-        """
-        if var == "dp":
-            if self.dp is None:
-                self.read_dp()
-            flat_var = self.dp.flatten()
-        else:
-            flat_var = self.nc_dset[grp][var][:].flatten()
-        var_mean = flat_var.mean()
-        var_std = flat_var.std(ddof=1)
-        if color is None:
-            line = ax.axvline(x=var_mean, color=color, linestyle="--")
-            ax.hist(
-                flat_var,
-                edgecolor=line.get_color(),
-                facecolor="None",
-                label=f"{label}{var_mean:.2e}$\pm${var_std:.2e}",
-            )
-        else:
-            ax.hist(
-                flat_var,
-                edgecolor=color,
-                facecolor="None",
-                label=f"{label}{var_mean:.2e}$\pm${var_std:.2e}",
-            )
-            ax.axvline(x=var_mean, color=color, linestyle="--")
 
     def spec_plot(self, ax: plt.Axes, j: int, i: int, label: str) -> None:
         """
@@ -497,22 +462,72 @@ class msat_collection:
             ax.grid()
             ax.legend()
 
-    def hist(self, grp: str, var: str, ids: Optional[List[int]] = None) -> None:
+    def hist(
+        self,
+        ax: plt.Axes,
+        label: str = None,
+        color: str = None,
+        rng: Optional[Annotated[Sequence[float], 2]] = None,
+        nbins: int = 100,
+        scale: float = 1.0,
+        exp_fmt: bool = True,
+        var: str = None,
+        grp: Optional[str] = None,
+        sv_var: Optional[str] = None,
+        extra_id: Optional[int] = None,
+        extra_id_dim: Optional[str] = None,
+        ids: Optional[List[int]] = None,
+        ratio: bool = False,
+        option: Optional[str] = None,
+        option_axis_dim: str = "spectral_channel",
+        chunks: Union[str, Tuple] = "auto",
+        set_nan: Optional[float] = None,
+    ) -> None:
         """
-        Make a histogram for the given variable and given files
-        grp: complete group name
-        var: complete variable name
-        ids: list of ids of the msat files (from the keys of self.ids)
+        Plot a histogram of the given variable
+        ax: matplotlib axes object
+        ## make_hist arguments:
+        label: horizontal axis label
+        color: the color of the bars
+        rng: range of the horizontal axis
+        nbins: number of bins for the histogram
+        scale: quantity to multiply the variable with (can be useful to avoid overflow in the standard deviation of column amounts)
+        exp_fmt: if True, use .3e format for stats in the histogram legend. If false use .2f format
+        ## msat_collection.pmesh_prep arguments:
+        var: key contained in the variable to search (uses msat_nc fetch method)
+        grp: if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
+        sv_var: grp will be set to SpecFitDiagnostics and sv_var must be one of APrioriState or APosterioriState, and var must be the exact SubStateName of the state vector variable
+        extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables
+        extra_id_dim: name of the dimension along which extra_id will be selected
+        ids: list of ids corresponding to the keys of self.ids, used to select which files are concatenated
+        ratio: if True, return the variable divided by its median
+        option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std')
+        option_axis_dim: the axis along which the stat is applied
+        chunks: when self.use_dask is True, sets the chunk size for dask arrays
+        set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
         """
-        if ids is None:
-            ids = self.ids.keys()
-        self.init_plot(1)
-        file_list = [self.ids[i] for i in ids]
-        for i, msat_file in enumerate(file_list):
-            self.msat_files[msat_file].hist(self.ax, grp, var, f"ID={ids[i]}")
-        for ax in self.ax:
-            ax.grid()
-            ax.legend()
+        if ax is None:
+            self.init_plot(1)
+            fig, ax = self.fig, self.ax
+            fig.set_size_inches(8, 5)
+
+        x = self.pmesh_prep(
+            var,
+            grp,
+            sv_var,
+            extra_id,
+            extra_id_dim,
+            ids,
+            ratio,
+            option,
+            option_axis_dim,
+            chunks,
+            set_nan,
+        ).compute()
+
+        x = x[np.isfinite(x)].flatten() * scale
+
+        make_hist(ax, x, label, color, rng, nbins, exp_fmt)
 
     def pmesh_prep(
         self,
