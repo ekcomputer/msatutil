@@ -562,21 +562,26 @@ class msat_collection:
             ids = self.ids
         else:
             ids = {i: self.ids[i] for i in ids}
-        if (sv_var is not None) and (var not in ["APosterioriState", "APrioriState"]):
+        if (sv_var is not None) and (
+            var not in ["APosterioriState", "APrioriState", "IntermediateState"]
+        ):
             raise MSATError(
                 'var must be one of ["APrioriState","APosterioriState"] when sv_var is given'
             )
         elif sv_var is not None:
-            nc_slice = self.get_sv_slice(sv_var)
+            sv_slice = self.get_sv_slice(sv_var)
             grp = "SpecFitDiagnostics"
         else:
-            nc_slice = slice(None)
+            nc_slice = [slice(None)]
 
         if var == "dp" and self.msat_files[self.ids[0]].dp is None:
             self.read_dp()
 
         var_path = self.fetch_varpath(var, grp=grp)
         var_dim_map = self.get_dim_map(var_path)
+        if sv_var is not None:
+            nc_slice = [slice(None) for dim in var_dim_map]
+            nc_slice[var_dim_map["xmx"]] = sv_slice
         atrack_axis = var_dim_map["atrack"]
         x = []
         for num, i in enumerate(ids.values()):
@@ -586,7 +591,7 @@ class msat_collection:
                 if grp is None:
                     x.append(self.msat_files[i].fetch(var, chunks=chunks))
                 else:
-                    x.append(self.msat_files[i].get_var(var, grp, chunks=chunks)[nc_slice])
+                    x.append(self.msat_files[i].get_var(var, grp, chunks=chunks)[tuple(nc_slice)])
 
         if self.use_dask:
             x = da.concatenate(x, axis=atrack_axis)
