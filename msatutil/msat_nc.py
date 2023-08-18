@@ -238,8 +238,9 @@ class msat_nc:
                         sv_dict = self.nc_dset["SpecFitDiagnostics/APosterioriState"].__dict__
                         for sv_key, val in sv_dict.items():
                             if sv_key.startswith("SubStateName") and key in val.strip().lower():
+                                sv_slice = self.get_sv_slice(val.strip())
                                 print(
-                                    f"GROUP: {grp}\tVAR: {var} {self.nc_dset[grp][var].dimensions} \tSV_VAR: {val.strip()} \tSV_SLICE: {list(self.get_sv_slice(val.strip()))}"
+                                    f"GROUP: {grp}\tVAR: {var} {self.nc_dset[grp][var].dimensions} \tSV_VAR: {val.strip()} \tSV_SLICE: {list(range(sv_slice.start,sv_slice.stop))}"
                                 )
 
     def fetch(
