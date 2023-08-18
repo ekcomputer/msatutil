@@ -465,7 +465,7 @@ class msat_collection:
 
     def hist(
         self,
-        ax: plt.Axes,
+        ax: plt.Axes = None,
         label: str = None,
         color: str = None,
         rng: Optional[Annotated[Sequence[float], 2]] = None,
