@@ -23,42 +23,33 @@ def make_hist(
     nbins: number of bins for the histogram
     """
     if rng is not None:
-        x_rng = x[(x >= rng[0]) & (x <= rng[1])]
-        x_mean = np.nanmean(x_rng)
-        x_std = np.nanstd(x_rng, ddof=1)
-        x_med = np.nanmedian(x_rng)
-        if exp_fmt:
-            label = (
-                label
-            ) = f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
-        else:
-            label = (
-                label
-            ) = f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
-        bin_vals, bin_edges, patches = ax.hist(
-            x,
-            edgecolor=color,
-            facecolor="None",
-            label=label,
-            range=rng,
-            bins=nbins,
-            histtype="step",
-        )
+        rng_slice = (x > rng[0]) & (x <= rng[1])
     else:
-        x_mean = np.nanmean(x)
-        x_std = np.nanstd(x, ddof=1)
-        x_med = np.nanmedian(x)
-        if exp_fmt:
-            label = f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
-        else:
-            label = f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
-        bin_vals, bin_edges, patches = ax.hist(
-            x,
-            edgecolor=color,
-            facecolor="None",
-            label=label,
-            histtype="step",
-        )
+        rng_slice = slice(None)
+        rng = [np.min(x), np.max(x)]
+
+    x_rng = x[rng_slice]
+    x_mean = np.nanmean(x_rng)
+    x_std = np.nanstd(x_rng, ddof=1)
+    x_med = np.nanmedian(x_rng)
+    if exp_fmt:
+        label = (
+            label
+        ) = f"{label}\n$\mu\pm\sigma$: {x_mean:.3e}$\pm${x_std:.3e}\nmedian: {x_med:.3e} "
+    else:
+        label = (
+            label
+        ) = f"{label}\n$\mu\pm\sigma$: {x_mean:.2f}$\pm${x_std:.2f}\nmedian: {x_med:.2f} "
+    bin_vals, bin_edges, patches = ax.hist(
+        x,
+        edgecolor=color,
+        facecolor="None",
+        label=label,
+        range=rng,
+        bins=nbins,
+        histtype="step",
+    )
+
     ax.axvline(x=x_med, color=color, linestyle="--")
     ax.legend(frameon=False)
     return np.max(bin_vals)
