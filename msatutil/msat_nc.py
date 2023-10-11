@@ -79,6 +79,9 @@ class msat_nc:
             "k2_alb": "alb_kernel",
             "p2_alb": "alb_poly",
             "iter_x": "iter_x",
+            "iter_w": "iter_w",
+            "err_col": "err_col",
+            "err_proxy": "err_proxy"
         }
 
         self.dim_size_map = {

@@ -306,6 +306,9 @@ class msat_collection:
             "xmx",
             "nsubx",
             "iter_x",
+            "iter_w",
+            "err_col",
+            "err_proxy"
         ]
 
     def __enter__(self) -> None:
