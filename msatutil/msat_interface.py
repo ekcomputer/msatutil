@@ -20,6 +20,7 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import pickle
 from tqdm import tqdm
 from msatutil.make_hist import make_hist
+from msatutil.msat_dset import msat_dset, gs_list
 
 
 def meters_to_lat_lon(x: float, lat: float) -> float:
@@ -108,7 +109,10 @@ def get_msat(
     """
     Function to get the L1B or L2 files under indir into a msat_collection object
     """
-    flist = glob.glob(os.path.join(indir, srchstr))
+    if indir.startswith("gs://"):
+        flist = gs_list(indir, srchstr=srchstr)
+    else:
+        flist = glob.glob(os.path.join(indir, srchstr))
     return msat_collection(flist, date_range=date_range, use_dask=True)
 
 
@@ -308,7 +312,7 @@ class msat_collection:
             "iter_x",
             "iter_w",
             "err_col",
-            "err_proxy"
+            "err_proxy",
         ]
 
     def __enter__(self) -> None:

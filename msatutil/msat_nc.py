@@ -4,6 +4,7 @@ import numpy as np
 import netCDF4 as ncdf
 from typing import Optional, Tuple, Union, List, Dict
 import dask.array as da
+from msatutil.msat_dset import msat_dset
 
 
 class MSATError(Exception):
@@ -18,12 +19,18 @@ class msat_nc:
 
     def __init__(self, infile: str, use_dask: bool = False) -> None:
         self.use_dask = use_dask
-        self.exists = os.path.exists(infile)
+
+        if infile.startswith("gs://"):
+            # will need to figure out how to determine a gs path exists and then update this
+            self.exists = True
+        else:
+            self.exists = os.path.exists(infile)
         if not self.exists:
             raise MSATError(f"Wrong path: {infile}")
         else:
-            self.nc_dset = ncdf.Dataset(infile, "r")
+            self.nc_dset = msat_dset(infile)
 
+        self.inpath = infile
         self.dp = None
         self.datetimes = None
         self.is_postproc = "product" in self.nc_dset.groups
@@ -81,7 +88,7 @@ class msat_nc:
             "iter_x": "iter_x",
             "iter_w": "iter_w",
             "err_col": "err_col",
-            "err_proxy": "err_proxy"
+            "err_proxy": "err_proxy",
         }
 
         self.dim_size_map = {
