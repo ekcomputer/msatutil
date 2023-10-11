@@ -1,3 +1,5 @@
+import os
+import re
 from google.cloud import storage
 from google.cloud.storage.blob import Blob
 from google.cloud.storage.client import Client
@@ -33,3 +35,20 @@ class msat_dset(Dataset):
             filename = nc_target
 
         super().__init__(filename, memory=data)
+
+
+def gs_list(gs_path: str, srchstr=None) -> list:
+    """
+    Return a list of blobs under gs_path
+
+    gs_path (str): google storage path
+    srchstr (Optional[str]): file search pattern (accepts wildcards *)
+    """
+    input_dir_blob = Blob.from_string(gs_path)
+    bucket_name = input_dir_blob.bucket.name
+    prefix = input_dir_blob.name
+    flist = list(storage.Client().list_blobs(bucket_name, prefix=prefix))
+    if srchstr is not None:
+        srchstr = srchstr.replace("*", "(.*?)")
+        flist = [i for i in flist if re.match(srchstr, os.path.basename(i.name))]
+    return [f"gs://{bucket_name}/{i.name}" for i in flist]
