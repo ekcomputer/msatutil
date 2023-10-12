@@ -20,7 +20,19 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import pickle
 from tqdm import tqdm
 from msatutil.make_hist import make_hist
-from msatutil.msat_dset import msat_dset, gs_list
+from msatutil.msat_dset import gs_list
+
+
+@dask.delayed
+def get_msat_file(file_path: str):
+    """
+    Function to open msat_collection object faster when there are many files
+
+    Inputs:
+        file_path (str): full path to the input netcdf file
+    """
+
+    return msat_file(file_path, use_dask=True)
 
 
 def meters_to_lat_lon(x: float, lat: float) -> float:
@@ -285,9 +297,16 @@ class msat_collection:
             [(i, msat_file_path) for i, msat_file_path in enumerate(self.file_paths)]
         )
         self.ids_rev = {val: key for key, val in self.ids.items()}
-        self.msat_files = OrderedDict(
-            [(file_path, msat_file(file_path, use_dask=use_dask)) for file_path in file_list]
-        )
+        if use_dask:
+            results = [get_msat_file(file_path) for file_path in file_list]
+            msat_file_list = dask.compute(*results)
+            self.msat_files = OrderedDict(
+                [(file_path, msat_file_list[i]) for i, file_path in enumerate(file_list)]
+            )
+        else:
+            self.msat_files = OrderedDict(
+                [(file_path, msat_file(file_path, use_dask=use_dask)) for file_path in file_list]
+            )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
         self.is_l1 = self.msat_files[self.ids[0]].is_l1
@@ -591,7 +610,10 @@ class msat_collection:
             nc_slice[var_dim_map["xmx"]] = sv_slice
         atrack_axis = var_dim_map["atrack"]
         x = []
-        for num, i in enumerate(ids.values()):
+        tqdm_disable = len(list(ids.values())) < 50
+        for num, i in tqdm(
+            enumerate(ids.values()), disable=tqdm_disable, leave=False, desc=var_path
+        ):
             if var == "dp":
                 x.append(self.msat_files[i].dp)
             else:
