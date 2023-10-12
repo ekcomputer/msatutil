@@ -344,6 +344,20 @@ class msat_collection:
         for f in self.msat_files.values():
             f.close()
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self) -> str:
+        return f"""msat_collection:
+        number of files: {len(self.file_paths)}
+        valid_xtrack: {self.valid_xtrack}
+        use_dask: {self.use_dask}
+        is_l1: {self.is_l1}
+        is_l2: {self.is_l2}
+        is_postproc: {self.is_postproc}
+        is_l2_met: {self.is_l2_met}
+        """
+
     def get_valid_xtrack(self):
         """
         Get the valid cross track indices
@@ -1090,8 +1104,11 @@ class msat_collection:
         """
         Fills self.dp for all the files in the collection
         """
-        for f, v in self.msat_files.items():
-            v.read_dp()
+        if self.use_dask:
+            dask.compute(*[dask.delayed(v.read_dp)() for f, v in self.msat_files.items()])
+        else:
+            for f, v in self.msat_files.items():
+                v.read_dp()
 
 
 def main():

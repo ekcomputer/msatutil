@@ -105,11 +105,24 @@ class msat_nc:
     def close(self) -> None:
         self.nc_dset.close()
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self) -> str:
+        return f"""msat_nc:
+        valid_xtrack: {self.valid_xtrack}
+        use_dask: {self.use_dask}
+        is_l1: {self.is_l1}
+        is_l2: {self.is_l2}
+        is_postproc: {self.is_postproc}
+        is_l2_met: {self.is_l2_met}
+        """
+
     def read_dp(self) -> None:
         """
         Getting the retrieved minus prior surface pressure in self.dp
         """
-        try:  # this is a try so we can use the same class to read the L1 files
+        if self.is_l2:
             if "o2dp_fit_diagnostics" in self.nc_dset.groups:
                 self.dp = self.nc_dset["o2dp_fit_diagnostics"]["bias_corrected_delta_pressure"][:]
                 return
@@ -124,8 +137,6 @@ class msat_nc:
                 self.dp = da.from_array(
                     self.nc_dset["SpecFitDiagnostics"]["APosterioriState"][sp_slice]
                 ) - da.from_array(self.nc_dset["SpecFitDiagnostics"]["APrioriState"][sp_slice])
-        except Exception:
-            pass
 
     def get_var(
         self,
