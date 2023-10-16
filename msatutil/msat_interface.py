@@ -13,6 +13,7 @@ from collections import OrderedDict
 from typing import Optional, Sequence, Tuple, Union, Annotated, List, Dict
 import dask
 import dask.array as da
+from dask.diagnostics import ProgressBar
 import time
 from scipy.interpolate import griddata
 from scipy.spatial import Delaunay
@@ -299,7 +300,11 @@ class msat_collection:
         self.ids_rev = {val: key for key, val in self.ids.items()}
         if use_dask:
             results = [get_msat_file(file_path) for file_path in file_list]
-            msat_file_list = dask.compute(*results)
+            if len(results) > 50:
+                with ProgressBar():
+                    msat_file_list = dask.compute(*results)
+            else:
+                msat_file_list = dask.compute(*results)
             self.msat_files = OrderedDict(
                 [(file_path, msat_file_list[i]) for i, file_path in enumerate(file_list)]
             )
@@ -626,7 +631,11 @@ class msat_collection:
         x = []
         tqdm_disable = len(list(ids.values())) < 50
         for num, i in tqdm(
-            enumerate(ids.values()), disable=tqdm_disable, leave=False, desc=var_path
+            enumerate(ids.values()),
+            total=len(ids),
+            disable=tqdm_disable,
+            leave=False,
+            desc=var_path,
         ):
             if var == "dp":
                 x.append(self.msat_files[i].dp)
