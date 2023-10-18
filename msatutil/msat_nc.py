@@ -33,7 +33,7 @@ class msat_nc:
         self.inpath = infile
         self.dp = None
         self.datetimes = None
-        self.is_postproc = "product" in self.nc_dset.groups
+        self.is_postproc = "product_co2proxy" in self.nc_dset.groups
         self.is_l2_met = "Surface_Band1" in self.nc_dset.groups
         self.is_l2 = not self.is_l2_met and (("Level1" in self.nc_dset.groups) or self.is_postproc)
         self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc]
@@ -110,7 +110,6 @@ class msat_nc:
 
     def __str__(self) -> str:
         return f"""msat_nc:
-        valid_xtrack: {self.valid_xtrack}
         use_dask: {self.use_dask}
         is_l1: {self.is_l1}
         is_l2: {self.is_l2}
@@ -413,7 +412,7 @@ class msat_nc:
                     np.nanmedian(self.nc_dset[longitude_varpath][:], axis=atrack_axis).squeeze()
                 )
             )[0]
-        else:
+        elif self.is_l1:
             var_dim_map = self.get_dim_map("Band1/Radiance")
             spec_axis = var_dim_map["spectral_channel"]
             atrack_axis = var_dim_map["atrack"]
