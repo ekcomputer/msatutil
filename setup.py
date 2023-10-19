@@ -8,7 +8,7 @@ setup(
     description="Utility codes to read and plot from MethaneSAT/AIR files",
     author="Sebastien Roche",
     author_email="sroche@g.harvard.edu",
-    version="3.3.1",  # make sure stays in sync with the version in msatutil/__init__.py
+    version="3.4.0",  # make sure stays in sync with the version in msatutil/__init__.py
     url="https://github.com/rocheseb/msatutil",
     classifiers=[
         "Operating System :: OS Independent",

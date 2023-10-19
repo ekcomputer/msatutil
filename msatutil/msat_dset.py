@@ -36,6 +36,17 @@ class msat_dset(Dataset):
 
         super().__init__(filename, memory=data)
 
+        # Can't simply do self.source = nc_target
+        # that would be trying to write to the read-only Dataset parameters
+        if "blob" in str(type(nc_target)).lower():
+            self.__dict__["source"] = f"gs://{nc_target.bucket.name}/{nc_target.name}"
+        else:
+            self.__dict__["source"] = nc_target
+
+        @property
+        def source(self):
+            return self.__dict__["source"]
+
 
 def gs_list(gs_path: str, srchstr=None) -> list:
     """
