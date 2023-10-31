@@ -6,11 +6,12 @@ _mydir = os.path.dirname(__file__)
 # extra dependencies for mair_geoviews.ipynb
 extras = {
     "notebooks": [
-        "ipython",
+        "notebook",
         "panel",
         "holoviews",
         "cartopy",
         "geoviews",
+        "datashader",
     ],
 }
 
@@ -26,8 +27,16 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.9",
     ],
-    install_requires=["dask", "netcdf4", "matplotlib", "pandas", "scipy", "tqdm"],
-    extras_require=["notebooks"],
+    install_requires=[
+        "dask",
+        "netcdf4",
+        "matplotlib",
+        "pandas",
+        "scipy",
+        "tqdm",
+        "google-cloud-storage",
+        ],
+    extras_require=extras,
     packages=find_packages(),
     include_package_data=True,
     license="MIT",
