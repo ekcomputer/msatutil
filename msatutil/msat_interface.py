@@ -590,6 +590,7 @@ class msat_collection:
         option_axis_dim: str = "spectral_channel",
         chunks: Union[str, Tuple] = "auto",
         set_nan: Optional[float] = None,
+        use_valid_xtrack: bool = False,
     ) -> Union[np.ndarray, da.core.Array]:
         """
         get a variable ready to plot with plt.pcolormesh(var)
@@ -604,6 +605,7 @@ class msat_collection:
         option_axis_dim: the axis along which the stat is applied
         chunks: when self.use_dask is True, sets the chunk size for dask arrays
         set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
+        use_valid_xtrack (bool): if True, only gets the data along the self.valid_xtrack slice
         """
         if ids is None:
             ids = self.ids
@@ -666,9 +668,11 @@ class msat_collection:
                 x = getattr(np, option)(x, axis=option_axis)
         elif (extra_id is not None) and (extra_id_dim is not None):
             extra_id_dim_axis = var_dim_map[extra_id_dim]
-            x_slices = [slice(None) for i in range(len(x.shape))]
             x_slices[extra_id_dim_axis] = extra_id
-            x = x[tuple(x_slices)]
+        if use_valid_xtrack and "xtrack" in var_dim_map:
+            xtrack_dim_axis = var_dim_map["xtrack"]
+            x_slices[xtrack_dim_axis] = self.valid_xtrack
+        x = x[tuple(x_slices)]
 
         x = x.squeeze()
 
@@ -700,6 +704,7 @@ class msat_collection:
         method: str = "cubic",
         res: float = 20,
         set_nan: Optional[float] = None,
+        use_valid_xtrack: bool = False,
     ) -> da.core.Array:
         """
         get a variable ready to plot with plt.pcolormesh(lon_grid,lat_grid,x_grid_avg)
@@ -719,6 +724,7 @@ class msat_collection:
         method: griddata interpolation method
         res: grid resolution in meters
         set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
+        use_valid_xtrack (bool): if True, only gets the data along the self.valid_xtrack slice
         """
         if not self.use_dask:
             raise MSATError("grid_prep needs self.use_dask==True")
@@ -763,6 +769,7 @@ class msat_collection:
                 ratio=ratio,
                 chunks=chunks,
                 set_nan=set_nan,
+                use_valid_xtrack=use_valid_xtrack,
             )
             lat = self.pmesh_prep("Latitude", ids=ids_slice, chunks=chunks)
             lon = self.pmesh_prep("Longitude", ids=ids_slice, chunks=chunks)
@@ -861,6 +868,7 @@ class msat_collection:
         scale: float = 1.0,
         cmap: str = "viridis",
         set_nan: Optional[float] = None,
+        use_valid_xtrack: bool = False,
     ) -> None:
         """
         Make a heatmap of the given variable
@@ -886,6 +894,7 @@ class msat_collection:
         scale: a factor with which the data will be scaled
         cmap: matplotlib named colormaps (https://matplotlib.org/stable/gallery/color/colormap_reference.html)
         set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
+        use_valid_xtrack (bool): if True, only gets the data along the self.valid_xtrack slice
         """
         if ids is None:
             ids = self.ids
@@ -906,6 +915,9 @@ class msat_collection:
         if gridded and not self.use_dask:
             raise MSATError("/!\\ the gridded argument only works when self.use_dask is True")
 
+        if latlon and not use_valid_xtrack:
+            use_valid_xtrack = True
+
         if not gridded:
             x = self.pmesh_prep(
                 var,
@@ -919,6 +931,7 @@ class msat_collection:
                 ratio=ratio,
                 chunks=chunks,
                 set_nan=set_nan,
+                use_valid_xtrack=use_valid_xtrack,
             )
             x = x * scale
             if latlon:
@@ -932,11 +945,13 @@ class msat_collection:
                     lat_str,
                     ids=ids,
                     chunks=chunks,
+                    use_valid_xtrack=use_valid_xtrack,
                 )
                 lon = self.pmesh_prep(
                     lon_str,
                     ids=ids,
                     chunks=chunks,
+                    use_valid_xtrack=use_valid_xtrack,
                 )
 
             if vminmax is None:
