@@ -3,6 +3,17 @@ from setuptools import setup, find_packages
 
 _mydir = os.path.dirname(__file__)
 
+# extra dependencies for mair_geoviews.ipynb
+extras = {
+    "notebooks": [
+        "ipython",
+        "panel",
+        "holoviews",
+        "cartopy",
+        "geoviews",
+    ],
+}
+
 setup(
     name="msatutil",
     description="Utility codes to read and plot from MethaneSAT/AIR files",
@@ -16,14 +27,7 @@ setup(
         "Programming Language :: Python :: 3.9",
     ],
     install_requires=["dask", "netcdf4", "matplotlib", "pandas", "scipy", "tqdm"],
-    # extras for mair_geoviews.ipynb
-    extras_require=[
-        "ipython",
-        "panel",
-        "holoviews",
-        "cartopy",
-        "geoviews",
-    ],
+    extras_require=["notebooks"],
     packages=find_packages(),
     include_package_data=True,
     license="MIT",
