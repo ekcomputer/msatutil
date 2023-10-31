@@ -281,10 +281,10 @@ class msat_collection:
             end_dates = end_dates[sort_ids]
 
             if date_range:
-                file_list = file_list[(start_dates > date_range[0]) & (start_dates < date_range[1])]
-                start_dates = start_dates[
-                    (start_dates > date_range[0]) & (start_dates < date_range[1])
-                ]
+                date_ids = (start_dates >= date_range[0]) & (start_dates < date_range[1])
+                file_list = file_list[date_ids]
+                start_dates = start_dates[date_ids]
+                end_dates = end_dates[date_ids]
             self.start_dates = start_dates
             self.end_dates = end_dates
         except (ValueError, IndexError):
@@ -293,10 +293,8 @@ class msat_collection:
             self.end_dates = None
 
         self.file_paths = file_list
-        self.file_names = [os.path.basename(msat_file) for msat_file in file_list]
-        self.ids = OrderedDict(
-            [(i, msat_file_path) for i, msat_file_path in enumerate(self.file_paths)]
-        )
+        self.file_names = [os.path.basename(file_path) for file_path in file_list]
+        self.ids = OrderedDict([(i, file_path) for i, file_path in enumerate(file_list)])
         self.ids_rev = {val: key for key, val in self.ids.items()}
         if use_dask:
             results = [get_msat_file(file_path) for file_path in file_list]
@@ -318,6 +316,7 @@ class msat_collection:
         self.is_l2 = self.msat_files[self.ids[0]].is_l2
         self.is_l2_met = self.msat_files[self.ids[0]].is_l2_met
         self.is_postproc = self.msat_files[self.ids[0]].is_postproc
+        self.is_l3 = self.msat_files[self.ids[0]].is_l3
         self.valid_xtrack = self.get_valid_xtrack()
         self.dim_size_map = self.msat_files[self.ids[0]].dim_size_map
         # when using self.get_dim_map(var_path), the result maps dimensions to dimension axis using the common set of dimensions names common_dim_set
@@ -337,6 +336,8 @@ class msat_collection:
             "iter_w",
             "err_col",
             "err_proxy",
+            "lat",  # L3 dims
+            "lon",  # L3 dims
         ]
 
     def __enter__(self) -> None:
@@ -359,6 +360,7 @@ class msat_collection:
         use_dask: {self.use_dask}
         is_l1: {self.is_l1}
         is_l2: {self.is_l2}
+        is_l3: {self.is_l3}
         is_postproc: {self.is_postproc}
         is_l2_met: {self.is_l2_met}
         """
@@ -627,7 +629,10 @@ class msat_collection:
         if sv_var is not None:
             nc_slice = [slice(None) for dim in var_dim_map]
             nc_slice[var_dim_map["xmx"]] = sv_slice
-        atrack_axis = var_dim_map["atrack"]
+        if self.is_l3:
+            atrack_axis = 0
+        else:
+            atrack_axis = var_dim_map["atrack"]
         x = []
         tqdm_disable = len(list(ids.values())) < 50
         for num, i in tqdm(
@@ -651,6 +656,8 @@ class msat_collection:
         else:
             x = np.concatenate(x, axis=atrack_axis)
             x[np.greater(x, 1e29)] = np.nan
+
+        x_slices = [slice(None) for i in range(len(x.shape))]
         if option is not None:
             option_axis = var_dim_map[option_axis_dim]
             if self.use_dask:
@@ -828,7 +835,6 @@ class msat_collection:
             kwargs["ids"] = ids
             self.heatmap(**kwargs)
 
-    # @timeit
     def heatmap(
         self,
         var: str,
@@ -916,13 +922,19 @@ class msat_collection:
             )
             x = x * scale
             if latlon:
+                if self.is_l3:
+                    lon_str = "lon"
+                    lat_str = "lat"
+                else:
+                    lon_str = "Longitude"
+                    lat_str = "Latitude"
                 lat = self.pmesh_prep(
-                    "Latitude",
+                    lat_str,
                     ids=ids,
                     chunks=chunks,
                 )
                 lon = self.pmesh_prep(
-                    "Longitude",
+                    lon_str,
                     ids=ids,
                     chunks=chunks,
                 )
@@ -930,27 +942,25 @@ class msat_collection:
             if vminmax is None:
                 if latlon:
                     m = ax.pcolormesh(
-                        lon[:, self.valid_xtrack],
-                        lat[:, self.valid_xtrack],
-                        x[:, self.valid_xtrack],
+                        lon,
+                        lat,
+                        x,
                         cmap=cmap,
                     )
                 else:
-                    m = ax.pcolormesh(x[:, self.valid_xtrack], cmap=cmap)
+                    m = ax.pcolormesh(x, cmap=cmap)
             else:
                 if latlon:
                     m = ax.pcolormesh(
-                        lon[:, self.valid_xtrack],
-                        lat[:, self.valid_xtrack],
-                        x[:, self.valid_xtrack],
+                        lon,
+                        lat,
+                        x,
                         cmap=cmap,
                         vmin=vminmax[0],
                         vmax=vminmax[1],
                     )
                 else:
-                    m = ax.pcolormesh(
-                        x[:, self.valid_xtrack], cmap=cmap, vmin=vminmax[0], vmax=vminmax[1]
-                    )
+                    m = ax.pcolormesh(x, cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
             # end of if not gridded
         elif gridded:
             lon_grid, lat_grid, gridded_x = self.grid_prep(
@@ -1030,8 +1040,12 @@ class msat_collection:
             ax.set_xlabel("Longitude")
             ax.set_ylabel("Latitude")
         else:
-            ax.set_ylabel("along-track index")
-            ax.set_xlabel("cross-track index")
+            if self.is_l3:
+                ax.set_ylabel("Latitude index")
+                ax.set_xlabel("Longitude index")
+            else:
+                ax.set_ylabel("along-track index")
+                ax.set_xlabel("cross-track index")
 
         # disable scientific notations in axis numbers
         ax.get_xaxis().get_major_formatter().set_useOffset(False)
@@ -1102,6 +1116,18 @@ class msat_collection:
         Display the state vector variable names
         """
         self.msat_files[self.ids[0]].show_sv()
+
+    def get_var_paths(self) -> List[str]:
+        """
+        Get a list of all the full variable paths in the netcdf file
+        """
+        return self.msat_files[self.ids[0]].get_var_paths()
+
+    def has_var(self, var: str) -> bool:
+        """
+        Check if the netcdf file has the given variable
+        """
+        return self.msat_files[self.ids[0]].has_var(var)
 
     def set_use_dask(self, use_dask: bool) -> None:
         self.use_dask = use_dask

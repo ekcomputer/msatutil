@@ -33,10 +33,13 @@ class msat_nc:
         self.inpath = infile
         self.dp = None
         self.datetimes = None
+        self.is_l3 = "Provenance" in self.nc_dset.groups and hasattr(
+            self.nc_dset["Provenance"], "msat_level3"
+        )
         self.is_postproc = "product_co2proxy" in self.nc_dset.groups
         self.is_l2_met = "Surface_Band1" in self.nc_dset.groups
         self.is_l2 = not self.is_l2_met and (("Level1" in self.nc_dset.groups) or self.is_postproc)
-        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc]
+        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc, self.is_l3]
         self.varpath_list = None
 
         # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
@@ -89,6 +92,8 @@ class msat_nc:
             "iter_w": "iter_w",
             "err_col": "err_col",
             "err_proxy": "err_proxy",
+            "lat": "lat",  # L3 dims
+            "lon": "lon",  # L3 dims
         }
 
         self.dim_size_map = {
@@ -113,6 +118,7 @@ class msat_nc:
         use_dask: {self.use_dask}
         is_l1: {self.is_l1}
         is_l2: {self.is_l2}
+        is_l3: {self.is_l3}
         is_postproc: {self.is_postproc}
         is_l2_met: {self.is_l2_met}
         """
@@ -155,12 +161,12 @@ class msat_nc:
             return self.datetimes
         elif grp is not None:
             if self.use_dask:
-                return da.from_array(self.nc_dset[grp][var], chunks=chunks)
-            return self.nc_dset[grp][var][tuple()]
+                return da.from_array(self.nc_dset[grp][var], chunks=chunks).astype(float)
+            return self.nc_dset[grp][var][tuple()].astype(float)
         else:
             if self.use_dask:
-                return da.from_array(self.nc_dset[var], chunks=chunks)
-            return self.nc_dset[var][tuple()]
+                return da.from_array(self.nc_dset[var], chunks=chunks).astype(float)
+            return self.nc_dset[var][tuple()].astype(float)
 
     def get_units(self, var: str, grp="") -> str:
         """
@@ -199,7 +205,7 @@ class msat_nc:
                 print(grp)
                 for var in self.nc_dset[grp].variables:
                     print("\t", var, self.nc_dset[grp][var].dimensions)
-        elif self.nc_dset.variables:
+        if self.nc_dset.variables:
             for var in self.nc_dset.variables:
                 print(var, self.nc_dset[var].dimensions)
 
@@ -216,6 +222,8 @@ class msat_nc:
         """
         Display the state vector variable names
         """
+        if not self.is_l2:
+            return
         sv_dict = self.nc_dset["SpecFitDiagnostics"]["APosterioriState"].__dict__
         for key, val in sv_dict.items():
             if type(val) == str:
@@ -227,6 +235,9 @@ class msat_nc:
         Get the state vector index for the given variable
         var: complete state vector variable name
         """
+        if not self.is_l2:
+            return slice(None)
+
         sv_dict = self.nc_dset["SpecFitDiagnostics"]["APosterioriState"].__dict__
 
         for key, val in sv_dict.items():
@@ -280,15 +291,17 @@ class msat_nc:
             for var in self.nc_dset.variables:
                 if key in var.lower():
                     if self.use_dask:
-                        return da.from_array(self.nc_dset[var], chunks=chunks)
-                    return self.nc_dset[var][:]
+                        return da.from_array(self.nc_dset[var], chunks=chunks).astype(float)
+                    return self.nc_dset[var][:].astype(float)
         if self.nc_dset.groups:
             for grp in self.nc_dset.groups:
                 for var in self.nc_dset[grp].variables:
                     if key in var.lower():
                         if self.use_dask:
-                            return da.from_array(self.nc_dset[grp][var], chunks=chunks)
-                        return self.nc_dset[grp][var][:]
+                            return da.from_array(self.nc_dset[grp][var], chunks=chunks).astype(
+                                float
+                            )
+                        return self.nc_dset[grp][var][:].astype(float)
 
     def fetch_units(self, key: str) -> str:
         """
@@ -396,7 +409,7 @@ class msat_nc:
         """
         Get the valid cross track indices
         """
-        if self.is_l2_met:
+        if self.is_l2_met or self.is_l3:
             return slice(None)
 
         if self.is_postproc:
@@ -432,7 +445,7 @@ class msat_nc:
         """
         Get the valid radiance indices
         """
-        if self.is_postproc:
+        if not (self.is_l2 or self.is_l1):
             return None
         if self.is_l2 and self.has_var("RTM_Band1/Radiance_I"):
             rad_var_path = "RTM_Band1/Radiance_I"
@@ -479,7 +492,7 @@ class msat_nc:
 
         return varpath_list
 
-    def has_var(self, var) -> bool:
+    def has_var(self, var: str) -> bool:
         """
         Check if the netcdf file has the given variable
         """
