@@ -24,11 +24,11 @@ The **msat_nc** class represents a single L1/L2/L2-pp/L3 file with added metadat
 
 Most useful methods are:
 
-* msat_nc.show_all: show all the variables in the file and their dimensions
-* msat_nc.search: search for a given keyword amongst the variables in the file
-* msat_nc.fetch: fetch the first variable data that corresponds to the given keyword
-* msat_nc.show_sv: for L2 files, show the state vector metadata
-* msat_nc.fetch_varpath: get the full variable path that corresponds to the given keyword
+* **msat_nc.show_all**: show all the variables in the file and their dimensions
+* **msat_nc.search**: search for a given keyword amongst the variables in the file
+* **msat_nc.fetch**: fetch the first variable data that corresponds to the given keyword
+* **msat_nc.show_sv**: for L2 files, show the state vector metadata
+* **msat_nc.fetch_varpath**: get the full variable path that corresponds to the given keyword
 
 #### msatutil.msat_interface
 
@@ -36,13 +36,13 @@ The most important object here is the **msat_collection** class which can open a
 
 Its most useful methods are:
 
-* msat_collection.pmesh_prep: returns a given variable from all the files concatenated along-track
+* **msat_collection.pmesh_prep**: returns a given variable from all the files concatenated along-track
 
-* msat_collection.grid_prep: returns rough L3, the given variable on a regular lat/lon grid using mean aggregation for overlaps
+* **msat_collection.grid_prep**: returns rough L3, the given variable on a regular lat/lon grid using mean aggregation for overlaps
 
-* msat_collection.heatmap: use matplotlib's pcolormesh to plot the given variable either in along-/across-track indices or in lat/lon
+* **msat_collection.heatmap**: use matplotlib's pcolormesh to plot the given variable either in along-/across-track indices or in lat/lon
 
-* msat_collection.hist: makes a histogram of the given variable
+* **msat_collection.hist**: makes a histogram of the given variable
 
 It has most of the **msat_nc** convenience methods
 
