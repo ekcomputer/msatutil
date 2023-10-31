@@ -38,6 +38,8 @@ Its most useful methods are:
 
 * msat_collection.pmesh_prep: returns a given variable from all the files concatenated along-track
 
+* msat_collection.grid_prep: returns rough L3, the given variable on a regular lat/lon grid using mean aggregation for overlaps
+
 * msat_collection.heatmap: use matplotlib's pcolormesh to plot the given variable either in along-/across-track indices or in lat/lon
 
 * msat_collection.hist: makes a histogram of the given variable
