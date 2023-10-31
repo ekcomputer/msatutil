@@ -8,7 +8,7 @@ setup(
     description="Utility codes to read and plot from MethaneSAT/AIR files",
     author="Sebastien Roche",
     author_email="sroche@g.harvard.edu",
-    version="3.6.0",  # make sure stays in sync with the version in msatutil/__init__.py
+    version="3.7.0",  # make sure stays in sync with the version in msatutil/__init__.py
     url="https://github.com/rocheseb/msatutil",
     classifiers=[
         "Operating System :: OS Independent",
@@ -16,6 +16,14 @@ setup(
         "Programming Language :: Python :: 3.9",
     ],
     install_requires=["dask", "netcdf4", "matplotlib", "pandas", "scipy", "tqdm"],
+    # extras for mair_geoviews.ipynb
+    extras_require=[
+        "ipython",
+        "panel",
+        "holoviews",
+        "cartopy",
+        "geoviews",
+    ],
     packages=find_packages(),
     include_package_data=True,
     license="MIT",
