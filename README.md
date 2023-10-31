@@ -59,7 +59,7 @@ There are notebooks showing example usage of the msatutil programs:
 
 [msat_interface](notebooks/msat_interface_example.ipynb)
 
-[compare_heatmaos](notebooks/compare_heatmaps_example.ipynb)
+[compare_heatmaps](notebooks/compare_heatmaps_example.ipynb)
 
 [mair_geoviews](notebooks/mair_geoviews.ipynb)
 
