@@ -76,3 +76,32 @@ e.g. from the parent directory of the cloned msatutil repo:
 #### with jupyter
 
 `jupyter notebook msatutil/notebooks/mair_geoviews.ipynb`
+
+
+# Console scripts
+
+**mairl3html** is a console entry point for generating static html plot of L3 mosaic files.
+
+Usage:
+
+`mairl3html l3_dir out_dir`
+
+Check detailed usage info with
+
+`mairl3html -h`
+
+The following directory structure is assumed for l3_dir:
+
+```
+L3_mosaic_dir/
+├── target_dir
+│   ├── resolution_dir
+│   │   └── mosaic_file.nc
+│   └── resolution_dir2
+│       └── mosaic_file.nc
+└── target_dir2
+    ├── resolution_dir
+    │   └── mosaic_file.nc
+    └── resolution_dir2
+        └── mosaic_file.nc
+```
