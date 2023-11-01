@@ -20,7 +20,7 @@ setup(
     description="Utility codes to read and plot from MethaneSAT/AIR files",
     author="Sebastien Roche",
     author_email="sroche@g.harvard.edu",
-    version="3.9.0",  # make sure stays in sync with the version in msatutil/__init__.py
+    version="3.10.0",  # make sure stays in sync with the version in msatutil/__init__.py
     url="https://github.com/rocheseb/msatutil",
     classifiers=[
         "Operating System :: OS Independent",
@@ -41,4 +41,9 @@ setup(
     include_package_data=True,
     license="MIT",
     python_requires=">=3.9",
+    entry_points={
+        "console_scripts": [
+            "mairl3html=msatutil.mair_geoviews:main",
+        ],
+    },
 )
