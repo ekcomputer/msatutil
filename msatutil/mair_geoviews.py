@@ -9,9 +9,9 @@ from holoviews.operation.datashader import rasterize
 import geoviews as gv
 from geoviews.tile_sources import EsriImagery
 
-from msatutil.msat_dset import msat_dset
+from msatutil.msat_dset import msat_dset, gs_list
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import subprocess
 
@@ -177,18 +177,38 @@ def L3_mosaics_to_html(
     width (int): plot width in pixels
     height (int): plot height in pixels
     """
-    target_dir_list = os.listdir(l3_dir)
+    l3_on_gs = l3_dir.startswith("gs://")
+    if l3_on_gs:
+        target_list = gs_list(l3_dir, srchstr="*_L3_mosaic_*.nc")
+        mosaic_file_dict = {}
+        for mosaic_file_path in target_list:
+            target = os.path.basename(os.path.dirname(os.path.dirname(mosaic_file_path)))
+            resolution = os.path.basename(os.path.dirname(mosaic_file_path))
+            if target not in mosaic_file_dict:
+                mosaic_file_dict[target] = {}
+            if resolution not in mosaic_file_dict[target]:
+                mosaic_file_dict[target][resolution] = []
+            mosaic_file_dict[target][resolution] += [os.path.basename(mosaic_file_path)]
+        target_list = mosaic_file_dict.keys()
+    else:
+        target_list = os.listdir(l3_dir)
 
-    for target in target_dir_list:
+    for target in target_list:
         print(target)
-        target_dir = os.path.join(l3_dir, target)
-        resolution_dir_list = os.listdir(target_dir)
-        for resolution in resolution_dir_list:
+        if l3_on_gs:
+            resolution_list = mosaic_file_dict[target].keys()
+        else:
+            target_dir = os.path.join(l3_dir, target)
+            resolution_list = mosaic_file_dict[target].keys()
+        for resolution in resolution_list:
             if resolution == "10m":
                 continue
             print(f"\t{resolution}")
-            resolution_dir = os.path.join(target_dir, resolution)
-            mosaic_file_list = os.listdir(resolution_dir)
+            if l3_on_gs:
+                mosaic_file_list = mosaic_file_dict[target][resolution]
+            else:
+                resolution_dir = os.path.join(target_dir, resolution)
+                mosaic_file_list = os.listdir(resolution_dir)
             for mosaic_file in mosaic_file_list:
                 print(f"\t\t{mosaic_file}")
 
