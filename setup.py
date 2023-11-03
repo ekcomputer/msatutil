@@ -26,6 +26,7 @@ setup(
         "Operating System :: OS Independent",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     install_requires=[
         "dask",
@@ -40,7 +41,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     license="MIT",
-    python_requires=">=3.9",
+    python_requires=">=3.9,<3.12",
     entry_points={
         "console_scripts": [
             "mairl3html=msatutil.mair_geoviews:main",
