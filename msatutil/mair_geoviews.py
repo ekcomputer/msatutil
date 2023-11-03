@@ -101,15 +101,61 @@ def show_map(
     return plot
 
 
+def do_single_map(
+    mosaic_file: str,
+    var: str,
+    out_path: Optional[str] = None,
+    title="",
+    cmap: str = "viridis",
+    width: int = 850,
+    height: int = 750,
+    alpha: float = 1,
+) -> None:
+    """
+    Save a html plot of var from mosaic_file
+
+    mosaic_file (str): full path to the input L3 mosaic file, can be a gs:// path
+    var (str): variable name in the L3 mosaic file
+    out_path (Optional[str]): full path to the output .html file or to a directory where it will be saved.
+                              If None, save output html file in the current working directory
+    title (str): title of the plot (include field name and units here)
+    cmap (str): colormap name
+    width (int): plot width in pixels
+    height (int): plot height in pixels
+    """
+    default_html_filename = os.path.basename(mosaic_file).replace(".nc", ".html")
+    if out_path is None:
+        out_file = os.path.join(os.getcwd(), default_html_filename)
+    elif os.path.splitext(out_path) == "":
+        os.makedirs(out_path)
+        out_file = os.path.join(out_path, default_html_filename)
+    else:
+        os.makedirs(os.path.dirname(out_path))
+        out_file = out_path
+
+    with msat_dset(mosaic_file) as nc:
+        lon = nc["lon"][:]
+        lat = nc["lat"][:]
+        v = nc[var][:]
+
+    plot = show_map(lon, lat, v, title=title, cmap=cmap, width=width, height=height, alpha=alpha)
+
+    hv.save(plot, out_file, backend="bokeh")
+
+    print(out_file)
+
+
 def L3_mosaics_to_html(
     l3_dir: str,
     out_dir: str,
+    var: str = "xch4",
     overwrite: bool = False,
     html_index: bool = False,
     title_prefix: str = "",
     cmap: str = "viridis",
     width: int = 850,
     height: int = 750,
+    alpha: float = 1,
 ) -> None:
     """
     l3_dir: full path to the L3 directory, assumes the following directory structure
@@ -125,6 +171,7 @@ def L3_mosaics_to_html(
 
     plot parameters:
 
+    var (str): name of the variable to plot from the L3 files
     title_prefix (str): plot titles will be "title_prefix; target; resolution; XCH4 (pbb)"
     cmap (str): name of the colormap
     width (int): plot width in pixels
@@ -155,18 +202,20 @@ def L3_mosaics_to_html(
 
                 mosaic_file_path = os.path.join(resolution_dir, mosaic_file)
 
-                with msat_dset(mosaic_file_path) as nc:
-                    lon = nc["lon"][:]
-                    lat = nc["lat"][:]
-                    xch4 = nc["xch4"][:]
-
                 title = (
                     f"{title_prefix}; {' '.join(target.split('_')[1:])}; {resolution}; XCH4 (ppb)"
                 )
-                plot = show_map(lon, lat, xch4, title=title, cmap=cmap, width=width, height=height)
 
-                hv.save(plot, plot_out_file, backend="bokeh")
-                del lon, lat, xch4, plot
+                do_single_map(
+                    mosaic_file_path,
+                    var,
+                    out_file=plot_out_file,
+                    title=title,
+                    cmap=cmap,
+                    width=width,
+                    height=height,
+                    alpha=alpha,
+                )
 
     if html_index:
         generate_html_index(out_dir)
@@ -187,19 +236,37 @@ def generate_html_index(out_dir: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("l3_dir", help="full path to the directory with L3 mosaic data")
-    parser.add_argument("out_dir", help="full path to the output directory")
     parser.add_argument(
-        "-o", "--overwrite", action="store_true", help="if given, overwrite existing plots"
+        "l3_path",
+        help="full path to the directory with L3 mosaic data or to a L3 mosaic file",
     )
-    parser.add_argument("-t", "--title", help="Will be added to the plot titles")
+    parser.add_argument(
+        "out_path",
+        help="full path to the output directory",
+    )
+    parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        help="if given, overwrite existing plots",
+    )
+    parser.add_argument(
+        "-t",
+        "--title",
+        help="Will be added to the plot titles",
+    )
     parser.add_argument(
         "-i",
         "--index",
         action="store_true",
         help="if given, will generate index.html files in the output directory tree",
     )
-    parser.add_argument("-c", "--cmap", default="viridis", help="colormap name")
+    parser.add_argument(
+        "-c",
+        "--cmap",
+        default="viridis",
+        help="colormap name",
+    )
     parser.add_argument(
         "--width",
         type=int,
@@ -212,18 +279,47 @@ def main():
         default=750,
         help=" heigh of the plots in pixels",
     )
+    parser.add_argument(
+        "-a",
+        "--alpha",
+        type=float,
+        default=1.0,
+        help="alpha value (transparency) for the plot, between 0 (transparent) and 1 (opaque)",
+    )
+    parser.add_argument(
+        "-v",
+        "--variable",
+        default="xch4",
+        help="name of the variable to plot from the L3 files",
+    )
     args = parser.parse_args()
 
-    L3_mosaics_to_html(
-        args.l3_dir,
-        args.out_dir,
-        overwrite=args.overwrite,
-        html_index=args.index,
-        title_prefix=args.title,
-        cmap=args.cmap,
-        width=args.width,
-        height=args.height,
-    )
+    if os.path.splitext(args.l3_path)[1] != "":
+        # If l3_path point directly to a L3 mosaic file
+        do_single_map(
+            args.l3_path,
+            args.variable,
+            out_path=args.out_path,
+            title=args.title,
+            cmap=args.cmap,
+            width=args.width,
+            height=args.height,
+            alpha=args.alpha,
+        )
+    else:
+        # If l3_path point to a directory
+        L3_mosaics_to_html(
+            args.l3_path,
+            args.out_path,
+            var=args.variable,
+            overwrite=args.overwrite,
+            html_index=args.index,
+            title_prefix=args.title,
+            cmap=args.cmap,
+            width=args.width,
+            height=args.height,
+            alpha=args.alpha,
+        )
 
 
 if __name__ == "__main__":
