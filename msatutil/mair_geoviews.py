@@ -9,9 +9,9 @@ from holoviews.operation.datashader import rasterize
 import geoviews as gv
 from geoviews.tile_sources import EsriImagery
 
-from msatutil.msat_dset import msat_dset
+from msatutil.msat_dset import msat_dset, gs_list
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import subprocess
 
@@ -130,7 +130,8 @@ def do_single_map(
         os.makedirs(out_path)
         out_file = os.path.join(out_path, default_html_filename)
     else:
-        os.makedirs(os.path.dirname(out_path))
+        if not os.path.exists(os.path.dirname(out_path)):
+            os.makedirs(os.path.dirname(out_path))
         out_file = out_path
 
     with msat_dset(mosaic_file) as nc:
@@ -177,19 +178,41 @@ def L3_mosaics_to_html(
     width (int): plot width in pixels
     height (int): plot height in pixels
     """
-    target_dir_list = os.listdir(l3_dir)
+    l3_on_gs = l3_dir.startswith("gs://")
+    if l3_on_gs:
+        target_list = gs_list(l3_dir, srchstr="*_L3_mosaic_*.nc")
+        mosaic_file_dict = {}
+        for mosaic_file_path in target_list:
+            target = os.path.basename(os.path.dirname(os.path.dirname(mosaic_file_path)))
+            resolution = os.path.basename(os.path.dirname(mosaic_file_path))
+            if target not in mosaic_file_dict:
+                mosaic_file_dict[target] = {}
+            if resolution not in mosaic_file_dict[target]:
+                mosaic_file_dict[target][resolution] = []
+            mosaic_file_dict[target][resolution] += [mosaic_file_path]
+        target_list = mosaic_file_dict.keys()
+    else:
+        target_list = os.listdir(l3_dir)
 
-    for target in target_dir_list:
+    for target in target_list:
         print(target)
-        target_dir = os.path.join(l3_dir, target)
-        resolution_dir_list = os.listdir(target_dir)
-        for resolution in resolution_dir_list:
+        if l3_on_gs:
+            resolution_list = mosaic_file_dict[target].keys()
+        else:
+            target_dir = os.path.join(l3_dir, target)
+            resolution_list = mosaic_file_dict[target].keys()
+        for resolution in resolution_list:
             if resolution == "10m":
                 continue
             print(f"\t{resolution}")
-            resolution_dir = os.path.join(target_dir, resolution)
-            mosaic_file_list = os.listdir(resolution_dir)
-            for mosaic_file in mosaic_file_list:
+            if l3_on_gs:
+                mosaic_file_list = [
+                    os.path.basename(i) for i in mosaic_file_dict[target][resolution]
+                ]
+            else:
+                resolution_dir = os.path.join(target_dir, resolution)
+                mosaic_file_list = os.listdir(resolution_dir)
+            for file_id, mosaic_file in enumerate(mosaic_file_list):
                 print(f"\t\t{mosaic_file}")
 
                 plot_out_dir = os.path.join(out_dir, target, resolution)
@@ -200,7 +223,10 @@ def L3_mosaics_to_html(
                 if os.path.exists(plot_out_file) and not overwrite:
                     continue
 
-                mosaic_file_path = os.path.join(resolution_dir, mosaic_file)
+                if l3_on_gs:
+                    mosaic_file_path = mosaic_file_dict[target][resolution][file_id]
+                else:
+                    mosaic_file_path = os.path.join(resolution_dir, mosaic_file)
 
                 title = (
                     f"{title_prefix}; {' '.join(target.split('_')[1:])}; {resolution}; XCH4 (ppb)"
@@ -209,7 +235,7 @@ def L3_mosaics_to_html(
                 do_single_map(
                     mosaic_file_path,
                     var,
-                    out_file=plot_out_file,
+                    out_path=plot_out_file,
                     title=title,
                     cmap=cmap,
                     width=width,
@@ -218,6 +244,7 @@ def L3_mosaics_to_html(
                 )
 
     if html_index:
+        print("Generating html index")
         generate_html_index(out_dir)
 
 
@@ -238,7 +265,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "l3_path",
-        help="full path to the directory with L3 mosaic data or to a L3 mosaic file",
+        help="full path to the directory with L3 mosaic data or to a L3 mosaic file, can be a gs:// path",
     )
     parser.add_argument(
         "out_path",
