@@ -130,7 +130,8 @@ def do_single_map(
         os.makedirs(out_path)
         out_file = os.path.join(out_path, default_html_filename)
     else:
-        os.makedirs(os.path.dirname(out_path))
+        if not os.path.exists(os.path.dirname(out_path)):
+            os.makedirs(os.path.dirname(out_path))
         out_file = out_path
 
     with msat_dset(mosaic_file) as nc:
@@ -188,7 +189,7 @@ def L3_mosaics_to_html(
                 mosaic_file_dict[target] = {}
             if resolution not in mosaic_file_dict[target]:
                 mosaic_file_dict[target][resolution] = []
-            mosaic_file_dict[target][resolution] += [os.path.basename(mosaic_file_path)]
+            mosaic_file_dict[target][resolution] += [mosaic_file_path]
         target_list = mosaic_file_dict.keys()
     else:
         target_list = os.listdir(l3_dir)
@@ -205,11 +206,13 @@ def L3_mosaics_to_html(
                 continue
             print(f"\t{resolution}")
             if l3_on_gs:
-                mosaic_file_list = mosaic_file_dict[target][resolution]
+                mosaic_file_list = [
+                    os.path.basename(i) for i in mosaic_file_dict[target][resolution]
+                ]
             else:
                 resolution_dir = os.path.join(target_dir, resolution)
                 mosaic_file_list = os.listdir(resolution_dir)
-            for mosaic_file in mosaic_file_list:
+            for file_id, mosaic_file in enumerate(mosaic_file_list):
                 print(f"\t\t{mosaic_file}")
 
                 plot_out_dir = os.path.join(out_dir, target, resolution)
@@ -220,7 +223,10 @@ def L3_mosaics_to_html(
                 if os.path.exists(plot_out_file) and not overwrite:
                     continue
 
-                mosaic_file_path = os.path.join(resolution_dir, mosaic_file)
+                if l3_on_gs:
+                    mosaic_file_path = mosaic_file_dict[target][resolution][file_id]
+                else:
+                    mosaic_file_path = os.path.join(resolution_dir, mosaic_file)
 
                 title = (
                     f"{title_prefix}; {' '.join(target.split('_')[1:])}; {resolution}; XCH4 (ppb)"
@@ -229,7 +235,7 @@ def L3_mosaics_to_html(
                 do_single_map(
                     mosaic_file_path,
                     var,
-                    out_file=plot_out_file,
+                    out_path=plot_out_file,
                     title=title,
                     cmap=cmap,
                     width=width,
@@ -238,6 +244,7 @@ def L3_mosaics_to_html(
                 )
 
     if html_index:
+        print("Generating html index")
         generate_html_index(out_dir)
 
 
