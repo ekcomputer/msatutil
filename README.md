@@ -82,18 +82,22 @@ e.g. from the parent directory of the cloned msatutil repo:
 
 **mairl3html** is a console entry point for generating static html plot of L3 mosaic files.
 
+It interfaces with [mair_geoviews.py](msatutil/mair_geoviews.py)
+
 Usage:
 
-`mairl3html l3_dir out_dir`
+`mairl3html l3_path out_path`
 
 Check detailed usage info with
 
 `mairl3html -h`
 
-The following directory structure is assumed for l3_dir:
+**l3_path** can be the path to a directory or file, it accepts **gs://** paths
+
+The following directory structure is assumed when **l3_path** is a directory:
 
 ```
-L3_mosaic_dir/
+l3_path
 ├── target_dir
 │   ├── resolution_dir
 │   │   └── mosaic_file.nc
@@ -105,3 +109,19 @@ L3_mosaic_dir/
     └── resolution_dir2
         └── mosaic_file.nc
 ```
+
+#### Other
+
+[generate_html_index.sh](msatutil/generate_html_index.sh) can be used to add index.html files under a directory structure
+
+It needs **[tree](https://linux.die.net/man/1/tree)** and is called with **mairl3html** when the **-i/--index** argument is given
+
+Usage:
+
+`sh generate_html_index.sh path_to_directory`
+
+
+#### Contact
+
+sroche@g.harvard.edu
+

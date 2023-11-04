@@ -265,7 +265,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "l3_path",
-        help="full path to the directory with L3 mosaic data or to a L3 mosaic file",
+        help="full path to the directory with L3 mosaic data or to a L3 mosaic file, can be a gs:// path",
     )
     parser.add_argument(
         "out_path",
