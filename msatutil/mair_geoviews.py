@@ -8,10 +8,11 @@ import holoviews as hv
 from holoviews.operation.datashader import rasterize
 import geoviews as gv
 from geoviews.tile_sources import EsriImagery
+import panel as pn
 
 from msatutil.msat_dset import msat_dset, gs_list
 
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, Union
 
 import subprocess
 
@@ -25,10 +26,11 @@ def show_map(
     width: int = 450,
     height: int = 450,
     cmap: str = "viridis",
-    clim: Optional[Tuple[float, float]] = None,
+    clim: Optional[Union[Tuple[float, float], bool]] = None,
     alpha: int = 1,
     title: str = "",
     background_tile=EsriImagery,
+    single_panel: bool = False,
 ):
     """
     Make a geoviews map of z overlayed on background_tile
@@ -41,11 +43,12 @@ def show_map(
         width (int): plot width in pixels
         height (int): plot height in pixels
         cmap (str): named colormap
-        clim (Optional[Tuple[float, float]]): z-limits for the colorbar, give False to use dynamic colorbar
+        clim (Optional[Union[Tuple[float, float],bool]]): z-limits for the colorbar, give False to use dynamic colorbar
         alpha (float): between 0 and 1, sets the opacity of the plotted z field
         title (str): plot title
         background_tile: the geoviews tile the plot will be made over and that will be in the linked 2nd panel
                          if None only makes one panel with no background but with the save tool active
+        single_panel (bool): if True, do not add the linked panel with only esri imagery
 
     Outputs:
         geoviews figure
@@ -71,7 +74,7 @@ def show_map(
     if clim is not False:
         raster = raster.opts(clim=clim)
 
-    if background_tile is not None:
+    if (background_tile is not None) and (not single_panel):
         # Make a dummy quadmesh that will have alpha=0 in the second panel so we can see the EsriImagery under the data
         # I do this so it will add a colorbar on the second plot so we don't need to think about resizing it
         # just use a small subset of data so it doesn't trigger much computations
@@ -95,6 +98,8 @@ def show_map(
 
     if background_tile is None:
         plot = raster
+    elif single_panel:
+        plot = background_tile * raster
     else:
         plot = background_tile * (raster + dummy)
 
@@ -105,11 +110,14 @@ def do_single_map(
     mosaic_file: str,
     var: str,
     out_path: Optional[str] = None,
-    title="",
+    title: str = "",
     cmap: str = "viridis",
+    clim: Optional[Union[Tuple[float, float], bool]] = None,
     width: int = 850,
     height: int = 750,
     alpha: float = 1,
+    panel_serve: bool = False,
+    single_panel: bool = False,
 ) -> None:
     """
     Save a html plot of var from mosaic_file
@@ -120,8 +128,11 @@ def do_single_map(
                               If None, save output html file in the current working directory
     title (str): title of the plot (include field name and units here)
     cmap (str): colormap name
+    clim (Optional[Union[Tuple[float, float],bool]]): z-limits for the colorbar, give False to use dynamic colorbar
     width (int): plot width in pixels
     height (int): plot height in pixels
+    panel_serve (bool): if True, start an interactive session
+    single_panel (bool): if True, do not add the linked panel with only esri imagery
     """
     default_html_filename = os.path.basename(mosaic_file).replace(".nc", ".html")
     if out_path is None:
@@ -139,11 +150,25 @@ def do_single_map(
         lat = nc["lat"][:]
         v = nc[var][:]
 
-    plot = show_map(lon, lat, v, title=title, cmap=cmap, width=width, height=height, alpha=alpha)
+    plot = show_map(
+        lon,
+        lat,
+        v,
+        title=title,
+        cmap=cmap,
+        clim=clim,
+        width=width,
+        height=height,
+        alpha=alpha,
+        single_panel=single_panel,
+    )
 
     hv.save(plot, out_file, backend="bokeh")
 
     print(out_file)
+
+    if panel_serve:
+        pn.serve(pn.Column(plot))
 
 
 def L3_mosaics_to_html(
@@ -154,9 +179,11 @@ def L3_mosaics_to_html(
     html_index: bool = False,
     title_prefix: str = "",
     cmap: str = "viridis",
+    clim: Optional[Union[Tuple[float, float], bool]] = None,
     width: int = 850,
     height: int = 750,
     alpha: float = 1,
+    single_panel: bool = False,
 ) -> None:
     """
     l3_dir: full path to the L3 directory, assumes the following directory structure
@@ -175,8 +202,10 @@ def L3_mosaics_to_html(
     var (str): name of the variable to plot from the L3 files
     title_prefix (str): plot titles will be "title_prefix; target; resolution; XCH4 (pbb)"
     cmap (str): name of the colormap
+    clim (Optional[Union[Tuple[float, float],bool]]): z-limits for the colorbar, give False to use dynamic colorbar
     width (int): plot width in pixels
     height (int): plot height in pixels
+    single_panel (bool): if True, do not add the linked panel with only esri imagery
     """
     l3_on_gs = l3_dir.startswith("gs://")
     if l3_on_gs:
@@ -238,9 +267,11 @@ def L3_mosaics_to_html(
                     out_path=plot_out_file,
                     title=title,
                     cmap=cmap,
+                    clim=clim,
                     width=width,
                     height=height,
                     alpha=alpha,
+                    single_panel=single_panel,
                 )
 
     if html_index:
@@ -280,6 +311,7 @@ def main():
     parser.add_argument(
         "-t",
         "--title",
+        default="",
         help="Will be added to the plot titles",
     )
     parser.add_argument(
@@ -293,6 +325,18 @@ def main():
         "--cmap",
         default="viridis",
         help="colormap name",
+    )
+    parser.add_argument(
+        "--clim-bounds",
+        nargs=2,
+        type=float,
+        default=None,
+        help="Set fixed limits for the colorbar",
+    )
+    parser.add_argument(
+        "--dynamic-clim",
+        action="store_true",
+        help="if given, using dynamic colorbar (readjusts to the data displayed)",
     )
     parser.add_argument(
         "--width",
@@ -319,7 +363,26 @@ def main():
         default="xch4",
         help="name of the variable to plot from the L3 files",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="if given, open the plot in an interactive session",
+    )
+    parser.add_argument(
+        "--single-panel",
+        action="store_true",
+        help="if given, do not add the linked panel with only ESRI imagery (e.g. with alpha<1)",
+    )
     args = parser.parse_args()
+
+    if args.dynamic_clim and args.clim_bounds is not None:
+        raise ("Cannot give both --clim-bounds and --dynamic-clim")
+    elif args.dynamic_clim:
+        clim = False
+    elif args.clim_bounds is not None:
+        clim = tuple(args.clim_bounds)
+    else:
+        clim = args.clim_bounds
 
     if os.path.splitext(args.l3_path)[1] != "":
         # If l3_path point directly to a L3 mosaic file
@@ -329,9 +392,12 @@ def main():
             out_path=args.out_path,
             title=args.title,
             cmap=args.cmap,
+            clim=clim,
             width=args.width,
             height=args.height,
             alpha=args.alpha,
+            panel_serve=args.serve,
+            single_panel=args.single_panel,
         )
     else:
         # If l3_path point to a directory
@@ -343,9 +409,11 @@ def main():
             html_index=args.index,
             title_prefix=args.title,
             cmap=args.cmap,
+            clim=clim,
             width=args.width,
             height=args.height,
             alpha=args.alpha,
+            single_panel=args.single_panel,
         )
 
 
