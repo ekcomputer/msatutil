@@ -137,8 +137,9 @@ def do_single_map(
     default_html_filename = os.path.basename(mosaic_file).replace(".nc", ".html")
     if out_path is None:
         out_file = os.path.join(os.getcwd(), default_html_filename)
-    elif os.path.splitext(out_path) == "":
-        os.makedirs(out_path)
+    elif os.path.splitext(out_path)[1] == "":
+        if not os.path.exists(out_path):
+            os.makedirs(out_path)
         out_file = os.path.join(out_path, default_html_filename)
     else:
         if not os.path.exists(os.path.dirname(out_path)):
