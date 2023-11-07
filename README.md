@@ -73,6 +73,10 @@ e.g. from the parent directory of the cloned msatutil repo:
 
 `panel serve --show msatutil/notebooks/mair_geoviews.ipynb`
 
+Or using the **mairl3html** console script with a direct file path and the **--serve** argument:
+
+`mairl3html l3_file_path out_path --serve`
+
 #### with jupyter
 
 `jupyter notebook msatutil/notebooks/mair_geoviews.ipynb`
@@ -109,6 +113,8 @@ l3_path
     └── resolution_dir2
         └── mosaic_file.nc
 ```
+
+When **l3_path** is a direct path to a file, **mairl3html** can be given the **--serve** argument to popup the plot with a local webserver (with live regridding)
 
 #### Other
 
