@@ -675,7 +675,6 @@ class msat_collection:
         if use_valid_xtrack and "xtrack" in var_dim_map:
             xtrack_dim_axis = var_dim_map["xtrack"]
             x_slices[xtrack_dim_axis] = self.valid_xtrack
-        print(x_slices)
         x = x[tuple(x_slices)]
 
         x = x.squeeze()
