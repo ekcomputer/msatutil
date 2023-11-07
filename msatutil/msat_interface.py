@@ -668,12 +668,14 @@ class msat_collection:
                 x = getattr(da, option)(x, axis=option_axis)
             else:
                 x = getattr(np, option)(x, axis=option_axis)
+            x_slices = [slice(None) for i in range(len(x.shape))]
         elif (extra_id is not None) and (extra_id_dim is not None):
             extra_id_dim_axis = var_dim_map[extra_id_dim]
             x_slices[extra_id_dim_axis] = extra_id
         if use_valid_xtrack and "xtrack" in var_dim_map:
             xtrack_dim_axis = var_dim_map["xtrack"]
             x_slices[xtrack_dim_axis] = self.valid_xtrack
+        print(x_slices)
         x = x[tuple(x_slices)]
 
         x = x.squeeze()
