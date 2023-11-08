@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import sys
 import glob
+import re
 import numpy as np
 import netCDF4 as ncdf
 from datetime import datetime
@@ -115,18 +116,25 @@ def timeit(func):
 
 
 def get_msat(
-    indir,
+    indir: str,
     date_range: Optional[Annotated[Sequence[datetime.datetime], 2]] = None,
+    date_pattern: str = r"%Y%m%dT%H%M%S",
     srchstr="Methane*.nc",
 ):
     """
     Function to get the L1B or L2 files under indir into a msat_collection object
+
+    Inputs:
+        indir (str): full path for the input directory, can be a gs:// path
+        date_range (Optional[Annotated[Sequence[datetime.datetime], 2]]): only the files within the date range will be kept
+        date_pattern (str): regex pattern for the date in the filenames
+        srchstr (str): search pattern for the files (accepts wildcards *)
     """
     if indir.startswith("gs://"):
         flist = gs_list(indir, srchstr=srchstr)
     else:
         flist = glob.glob(os.path.join(indir, srchstr))
-    return msat_collection(flist, date_range=date_range, use_dask=True)
+    return msat_collection(flist, date_range=date_range, date_pattern=date_pattern, use_dask=True)
 
 
 class msat_file(msat_nc):
@@ -252,63 +260,42 @@ class msat_collection:
 
     def __init__(
         self,
-        file_list: str,
+        file_list: List[str],
         date_range: Optional[Annotated[Sequence[datetime.datetime], 2]] = None,
+        date_pattern: str = r"%Y%m%dT%H%M%S",
         use_dask: bool = False,
     ) -> None:
+        """
+        file_list (List[str]): list of file paths
+        date_range (Optional[Annotated[Sequence[datetime.datetime], 2]]): only the files within the date range will be kept
+        date_pattern (str): regex pattern for the date in the filenames
+        use_dask (bool): if True, use dask to open files and read data
+        """
         self.set_use_dask(use_dask)
-        file_list = np.array(file_list)
-        try:
-            start_dates = np.array(
-                [
-                    datetime.strptime(
-                        os.path.basename(file_path).strip(".nc").split("_")[3], "%Y%m%dT%H%M%S"
-                    )
-                    for file_path in file_list
-                ]
-            )
-            end_dates = np.array(
-                [
-                    datetime.strptime(
-                        os.path.basename(file_path).strip(".nc").split("_")[4], "%Y%m%dT%H%M%S"
-                    )
-                    for file_path in file_list
-                ]
-            )
-            sort_ids = np.argsort(start_dates)
-            file_list = file_list[sort_ids]
-            start_dates = start_dates[sort_ids]
-            end_dates = end_dates[sort_ids]
+        self.file_list = np.array(file_list)
 
-            if date_range:
-                date_ids = (start_dates >= date_range[0]) & (start_dates < date_range[1])
-                file_list = file_list[date_ids]
-                start_dates = start_dates[date_ids]
-                end_dates = end_dates[date_ids]
-            self.start_dates = start_dates
-            self.end_dates = end_dates
-        except (ValueError, IndexError):
-            print("/!\\ The file names do not have the typical methaneair format")
-            self.start_dates = None
-            self.end_dates = None
+        self.parse_dates(date_range, date_pattern)
 
-        self.file_paths = file_list
-        self.file_names = [os.path.basename(file_path) for file_path in file_list]
-        self.ids = OrderedDict([(i, file_path) for i, file_path in enumerate(file_list)])
+        self.file_paths = self.file_list
+        self.file_names = [os.path.basename(file_path) for file_path in self.file_list]
+        self.ids = OrderedDict([(i, file_path) for i, file_path in enumerate(self.file_list)])
         self.ids_rev = {val: key for key, val in self.ids.items()}
         if use_dask:
-            results = [get_msat_file(file_path) for file_path in file_list]
+            results = [get_msat_file(file_path) for file_path in self.file_list]
             if len(results) > 50:
                 with ProgressBar():
                     msat_file_list = dask.compute(*results)
             else:
                 msat_file_list = dask.compute(*results)
             self.msat_files = OrderedDict(
-                [(file_path, msat_file_list[i]) for i, file_path in enumerate(file_list)]
+                [(file_path, msat_file_list[i]) for i, file_path in enumerate(self.file_list)]
             )
         else:
             self.msat_files = OrderedDict(
-                [(file_path, msat_file(file_path, use_dask=use_dask)) for file_path in file_list]
+                [
+                    (file_path, msat_file(file_path, use_dask=use_dask))
+                    for file_path in self.file_list
+                ]
             )
         self.dsets = {key: val.nc_dset for key, val in self.msat_files.items()}
 
@@ -364,6 +351,73 @@ class msat_collection:
         is_postproc: {self.is_postproc}
         is_l2_met: {self.is_l2_met}
         """
+
+    @staticmethod
+    def convert_time_format(time_format: str):
+        """
+        Return the regex corresponding to time_format
+        """
+        format_mapping = {
+            "%H": r"\d{2}",
+            "%M": r"\d{2}",
+            "%S": r"\d{2}",
+            "%m": r"\d{2}",
+            "%d": r"\d{2}",
+            "%y": r"\d{2}",
+            "%Y": r"\d{4}",
+        }
+
+        re_format = time_format
+        for code, pattern in format_mapping.items():
+            if re.search(code, re_format):
+                re_format = re_format.replace(code, pattern)
+
+        return re_format
+
+    def parse_dates(
+        self,
+        date_range: Optional[Annotated[Sequence[datetime.datetime], 2]] = None,
+        date_pattern: str = r"%Y%m%dT%H%M%S",
+    ):
+        """
+        sort the files
+        """
+        regex_pattern = self.convert_time_format(date_pattern)
+        date_pattern_matches = re.findall(regex_pattern, os.path.basename(self.file_list[0]))
+        n_matches = len(date_pattern_matches)
+
+        if date_pattern_matches:
+            start_dates = np.array(
+                [
+                    datetime.strptime(
+                        re.findall(regex_pattern, os.path.basename(file_path))[0], date_pattern
+                    )
+                    for file_path in self.file_list
+                ]
+            )
+            sort_ids = np.argsort(start_dates)
+            self.start_dates = start_dates[sort_ids]
+            self.file_list = self.file_list[sort_ids]
+
+            if n_matches >= 2:
+                self.end_dates = np.array(
+                    [
+                        datetime.strptime(
+                            re.findall(regex_pattern, os.path.basename(file_path))[1], date_pattern
+                        )
+                        for file_path in self.file_list
+                    ]
+                )
+            if date_range:
+                date_ids = (self.start_dates >= date_range[0]) & (self.start_dates < date_range[1])
+                self.file_list = self.file_list[date_ids]
+                self.start_dates = self.start_dates[date_ids]
+                if n_matches >= 2:
+                    self.end_dates = self.end_dates[date_ids]
+        else:
+            print(f"/!\\ No matches for {regex_pattern} in filenames")
+            self.start_dates = None
+            self.end_dates = None
 
     def get_valid_xtrack(self):
         """
@@ -483,7 +537,7 @@ class msat_collection:
             line = self.ax[2].axhline(y=rms, label=f"{msat_file}; rms={rms:.4f}")
             line.set_color(self.lines[msat_file].get_color())
 
-        self.ax[1].set_ylabel("$\Delta$P (hPa)")
+        self.ax[1].set_ylabel(r"$\Delta$P (hPa)")
         self.ax[1].set_title("Surface pressure change")
         self.ax[1].grid()
 
@@ -1032,7 +1086,7 @@ class msat_collection:
 
         # General plot layout
         if var == "dp":
-            lab = "$\Delta P$"
+            lab = r"$\Delta P$"
         elif sv_var:
             lab = sv_var
         else:
@@ -1050,10 +1104,10 @@ class msat_collection:
 
         if self.start_dates is not None:
             start_dates = sorted([self.start_dates[i] for i in ids])
-            end_dates = sorted([self.end_dates[i] for i in ids])
             ax.set_title(
-                f"{datetime.strftime(start_dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(end_dates[-1],'%Y%m%dT%H%M%S')}"
+                f"{datetime.strftime(start_dates[0],'%Y%m%dT%H%M%S')} to {datetime.strftime(start_dates[-1],'%Y%m%dT%H%M%S')}"
             )
+
         if gridded or latlon:
             ax.set_xlabel("Longitude")
             ax.set_ylabel("Latitude")
