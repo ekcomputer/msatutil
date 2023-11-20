@@ -126,6 +126,8 @@ def do_single_map(
 
     data_file (str): full path to the input netcdf data file, can be a gs:// path
     var (str): variable name in the data file
+    lon_var (str): name of the longitude variable
+    lat_var (str): name of the latitude variable
     out_path (Optional[str]): full path to the output .html file or to a directory where it will be saved.
                               If None, save output html file in the current working directory
     title (str): title of the plot (include field name and units here)
