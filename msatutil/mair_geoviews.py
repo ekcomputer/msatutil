@@ -107,8 +107,10 @@ def show_map(
 
 
 def do_single_map(
-    mosaic_file: str,
+    data_file: str,
     var: str,
+    lon_var: str = "lon",
+    lat_var: str = "lat",
     out_path: Optional[str] = None,
     title: str = "",
     cmap: str = "viridis",
@@ -120,10 +122,10 @@ def do_single_map(
     single_panel: bool = False,
 ) -> None:
     """
-    Save a html plot of var from mosaic_file
+    Save a html plot of var from data_file
 
-    mosaic_file (str): full path to the input L3 mosaic file, can be a gs:// path
-    var (str): variable name in the L3 mosaic file
+    data_file (str): full path to the input netcdf data file, can be a gs:// path
+    var (str): variable name in the data file
     out_path (Optional[str]): full path to the output .html file or to a directory where it will be saved.
                               If None, save output html file in the current working directory
     title (str): title of the plot (include field name and units here)
@@ -134,7 +136,7 @@ def do_single_map(
     panel_serve (bool): if True, start an interactive session
     single_panel (bool): if True, do not add the linked panel with only esri imagery
     """
-    default_html_filename = os.path.basename(mosaic_file).replace(".nc", ".html")
+    default_html_filename = os.path.basename(data_file).replace(".nc", ".html")
     if out_path is None:
         out_file = os.path.join(os.getcwd(), default_html_filename)
     elif os.path.splitext(out_path)[1] == "":
@@ -146,9 +148,9 @@ def do_single_map(
             os.makedirs(os.path.dirname(out_path))
         out_file = out_path
 
-    with msat_dset(mosaic_file) as nc:
-        lon = nc["lon"][:]
-        lat = nc["lat"][:]
+    with msat_dset(data_file) as nc:
+        lon = nc[lon_var][:]
+        lat = nc[lat_var][:]
         v = nc[var][:]
 
     plot = show_map(
@@ -176,6 +178,8 @@ def L3_mosaics_to_html(
     l3_dir: str,
     out_dir: str,
     var: str = "xch4",
+    lon_var: str = "lon",
+    lat_var: str = "lat",
     overwrite: bool = False,
     html_index: bool = False,
     title_prefix: str = "",
@@ -201,6 +205,8 @@ def L3_mosaics_to_html(
     plot parameters:
 
     var (str): name of the variable to plot from the L3 files
+    lon_var (str): name of the longitude variable
+    lat_var (str): name of the latitude variable
     title_prefix (str): plot titles will be "title_prefix; target; resolution; XCH4 (pbb)"
     cmap (str): name of the colormap
     clim (Optional[Union[Tuple[float, float],bool]]): z-limits for the colorbar, give False to use dynamic colorbar
@@ -265,6 +271,8 @@ def L3_mosaics_to_html(
                 do_single_map(
                     mosaic_file_path,
                     var,
+                    lon_var=lon_var,
+                    lat_var=lat_var,
                     out_path=plot_out_file,
                     title=title,
                     cmap=cmap,
@@ -364,6 +372,8 @@ def main():
         default="xch4",
         help="name of the variable to plot from the L3 files",
     )
+    parser.add_argument("--lon-var", default="lon", help="netCDF variable path for longitude")
+    parser.add_argument("--lat-var", default="lat", help="netCDF variable path for latitude")
     parser.add_argument(
         "--serve",
         action="store_true",
@@ -374,6 +384,7 @@ def main():
         action="store_true",
         help="if given, do not add the linked panel with only ESRI imagery (e.g. with alpha<1)",
     )
+
     args = parser.parse_args()
 
     if args.dynamic_clim and args.clim_bounds is not None:
@@ -390,6 +401,8 @@ def main():
         do_single_map(
             args.l3_path,
             args.variable,
+            lon_var=args.lon_var,
+            lat_var=args.lat_var,
             out_path=args.out_path,
             title=args.title,
             cmap=args.cmap,
@@ -406,6 +419,8 @@ def main():
             args.l3_path,
             args.out_path,
             var=args.variable,
+            lon_var=args.lon_var,
+            lat_var=args.lat_var,
             overwrite=args.overwrite,
             html_index=args.index,
             title_prefix=args.title,
