@@ -123,6 +123,7 @@ def do_single_map(
     alpha: float = 1,
     panel_serve: bool = False,
     single_panel: bool = False,
+    num_samples_threshold: Optional[float] = None,
 ) -> None:
     """
     Save a html plot of var from data_file
@@ -140,6 +141,7 @@ def do_single_map(
     height (int): plot height in pixels
     panel_serve (bool): if True, start an interactive session
     single_panel (bool): if True, do not add the linked panel with only esri imagery
+    num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     """
     default_html_filename = os.path.basename(data_file).replace(".nc", ".html")
     if out_path is None:
@@ -157,6 +159,9 @@ def do_single_map(
         lon = nc[lon_var][:]
         lat = nc[lat_var][:]
         v = nc[var][:]
+        if num_samples_threshold is not None:
+            num_samples = nc["num_samples"][:]
+            v[num_samples < num_samples_threshold] = np.nan
 
     plot = show_map(
         lon,
@@ -194,6 +199,7 @@ def L3_mosaics_to_html(
     height: int = 750,
     alpha: float = 1,
     single_panel: bool = False,
+    num_samples_threshold: Optional[float] = None,
 ) -> None:
     """
     l3_dir: full path to the L3 directory, assumes the following directory structure
@@ -218,6 +224,7 @@ def L3_mosaics_to_html(
     width (int): plot width in pixels
     height (int): plot height in pixels
     single_panel (bool): if True, do not add the linked panel with only esri imagery
+    num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     """
     l3_on_gs = l3_dir.startswith("gs://")
     if l3_on_gs:
@@ -286,6 +293,7 @@ def L3_mosaics_to_html(
                     height=height,
                     alpha=alpha,
                     single_panel=single_panel,
+                    num_samples_threshold=num_samples_threshold,
                 )
 
     if html_index:
@@ -389,6 +397,12 @@ def create_plot_parser(**kwargs):
         action="store_true",
         help="if given, do not add the linked panel with only ESRI imagery (e.g. with alpha<1)",
     )
+    plot_parser.add_argument(
+        "--filter-num-samples",
+        default=None,
+        type=float,
+        help="if used with L3 files, filter out data with num_samples<filter_num_samples",
+    )
     return plot_parser
 
 
@@ -485,6 +499,7 @@ def main():
                 alpha=args.alpha,
                 panel_serve=False,
                 single_panel=args.single_panel,
+                num_samples_threshold=args.filter_num_samples,
             )
 
     elif os.path.splitext(args.in_path)[1] != "":
@@ -503,6 +518,7 @@ def main():
             alpha=args.alpha,
             panel_serve=args.serve,
             single_panel=args.single_panel,
+            num_samples_threshold=args.filter_num_samples,
         )
     else:
         # If in_path point to a directory
@@ -521,6 +537,7 @@ def main():
             height=args.height,
             alpha=args.alpha,
             single_panel=args.single_panel,
+            num_samples_threshold=args.filter_num_samples,
         )
 
 
