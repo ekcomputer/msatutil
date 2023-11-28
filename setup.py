@@ -74,6 +74,7 @@ setup(
     entry_points={
         "console_scripts": [
             "mairl3html=msatutil.mair_geoviews:main",
+            "mairls=msatutil.mair_ls:main",
         ],
     },
 )

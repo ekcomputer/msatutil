@@ -4,6 +4,7 @@ warnings.simplefilter("ignore")
 import os
 import numpy as np
 import argparse
+import inspect
 import holoviews as hv
 from holoviews.operation.datashader import rasterize
 import geoviews as gv
@@ -11,6 +12,8 @@ from geoviews.tile_sources import EsriImagery
 import panel as pn
 
 from msatutil.msat_dset import msat_dset, gs_list
+from msatutil.mair_ls import mair_ls
+from msatutil.mair_ls import create_parser as create_ls_parser
 
 from typing import Optional, Tuple, Union
 
@@ -303,90 +306,136 @@ def generate_html_index(out_dir: str) -> None:
     )
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "l3_path",
-        help="full path to the directory with L3 mosaic data or to a L3 mosaic file, can be a gs:// path",
+def create_plot_parser(**kwargs):
+    plot_parser = argparse.ArgumentParser(**kwargs)
+    plot_parser.add_argument(
+        "in_path",
+        help="input path",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "out_path",
         help="full path to the output directory",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "-o",
         "--overwrite",
         action="store_true",
         help="if given, overwrite existing plots",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "-t",
         "--title",
         default="",
         help="Will be added to the plot titles",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "-i",
         "--index",
         action="store_true",
         help="if given, will generate index.html files in the output directory tree",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "-c",
         "--cmap",
         default="viridis",
         help="colormap name",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "--clim-bounds",
         nargs=2,
         type=float,
         default=None,
         help="Set fixed limits for the colorbar",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "--dynamic-clim",
         action="store_true",
         help="if given, using dynamic colorbar (readjusts to the data displayed)",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "--width",
         type=int,
         default=850,
         help="width of the plots in pixels",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "--height",
         type=int,
         default=750,
         help=" heigh of the plots in pixels",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "-a",
         "--alpha",
         type=float,
         default=1.0,
         help="alpha value (transparency) for the plot, between 0 (transparent) and 1 (opaque)",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "-v",
         "--variable",
         default="xch4",
         help="name of the variable to plot from the L3 files",
     )
-    parser.add_argument("--lon-var", default="lon", help="netCDF variable path for longitude")
-    parser.add_argument("--lat-var", default="lat", help="netCDF variable path for latitude")
-    parser.add_argument(
+    plot_parser.add_argument("--lon-var", default="lon", help="netCDF variable path for longitude")
+    plot_parser.add_argument("--lat-var", default="lat", help="netCDF variable path for latitude")
+    plot_parser.add_argument(
         "--serve",
         action="store_true",
         help="if given, open the plot in an interactive session",
     )
-    parser.add_argument(
+    plot_parser.add_argument(
         "--single-panel",
         action="store_true",
         help="if given, do not add the linked panel with only ESRI imagery (e.g. with alpha<1)",
     )
+    return plot_parser
 
+
+def create_parser():
+    description = """Generate interactive maps from L1B/L2/L3 MethaneSAT/AIR files
+
+    The behavior changes based on the nature of the in_path argument.
+
+    .directory: L3 specific, in_path is the path to a directory that has an assumed structure (see README)
+    .netcdf file: in_path is the full path to a L1B/L2/L3 file
+        the code will generate a static map for the given file
+        --serve is only used by this case to popup the plot with a local webserver with dynamic regridding
+    .csv file: in_path is the full path to a csv table that stores metadata on files
+        the code will use mair_ls to get a list of files matching the filter arguments and
+        will generate a static map for each file.
+        the following filter arguments are only used if in_path is a csv file:
+        --uri
+        --aggregation
+        --resolution
+        --production-operation
+        --flight-date
+        --timestamp
+        --time-start
+        --time-end
+        --production-environment
+        --latest
+        --molecule
+        --show (when given, exit after calling mair_ls, without generating plots)
+        the following arguments are ignored when in_path is a csv file:
+        --title
+        --serve
+
+    NOTE: Be careful when using a csv file as in_path, first check which files you would get using mairls
+    """
+    ls_parser = create_ls_parser(add_help=False)
+
+    plot_parser = create_plot_parser(
+        parents=[ls_parser],
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=description,
+    )
+
+    return plot_parser
+
+
+def main():
+    parser = create_parser()
     args = parser.parse_args()
 
     if args.dynamic_clim and args.clim_bounds is not None:
@@ -398,10 +447,50 @@ def main():
     else:
         clim = args.clim_bounds
 
-    if os.path.splitext(args.l3_path)[1] != "":
-        # If l3_path point directly to a L3 mosaic file
+    if args.in_path.endswith(".csv"):
+        mair_ls_arglist = inspect.getfullargspec(mair_ls).args
+        mair_ls_args = {k: v for k, v in vars(args).items() if k in mair_ls_arglist}
+        df = mair_ls(**mair_ls_args)
+        if args.show:
+            print("Exiting after showing list of files because --show was given")
+            return
+        uri_list = df.uri.tolist()
+        check = input(f"Will generate {len(uri_list)} maps, continue? (Y/N)\n")
+        if check.lower() not in ["y", "yes"]:
+            return
+        if "xch4" in args.variable.lower():
+            label = "XCH4 (ppb)"
+        else:
+            label = args.variable
+        if not os.path.exists(args.out_path):
+            os.makedirs(args.out_path)
+        for i, row in df.iterrows():
+            title = f'{row["flight_name"].upper()} {row["production_operation"]}; {row["level3_target_name"]}; {label}'
+            out_path = os.path.join(
+                args.out_path,
+                f'{row["flight_name"]}_{row["production_operation"]}_{row["aggregation"]}_{row["level3_resolution"]}_{row["level3_target_name"]}.html',
+            )
+            print(row["uri"])
+            do_single_map(
+                row["uri"],
+                args.variable,
+                lon_var=args.lon_var,
+                lat_var=args.lat_var,
+                out_path=out_path,
+                title=title,
+                cmap=args.cmap,
+                clim=clim,
+                width=args.width,
+                height=args.height,
+                alpha=args.alpha,
+                panel_serve=False,
+                single_panel=args.single_panel,
+            )
+
+    elif os.path.splitext(args.in_path)[1] != "":
+        # If in_path point directly to a L3 mosaic file
         do_single_map(
-            args.l3_path,
+            args.in_path,
             args.variable,
             lon_var=args.lon_var,
             lat_var=args.lat_var,
@@ -416,9 +505,9 @@ def main():
             single_panel=args.single_panel,
         )
     else:
-        # If l3_path point to a directory
+        # If in_path point to a directory
         L3_mosaics_to_html(
-            args.l3_path,
+            args.in_path,
             args.out_path,
             var=args.variable,
             lon_var=args.lon_var,

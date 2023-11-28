@@ -48,6 +48,26 @@ class msat_dset(Dataset):
             return self.__dict__["source"]
 
 
+class cloud_file:
+    def __init__(self, file_path: str, client=None):
+        self.file_path = file_path
+        self.client = client
+
+    def __enter__(self):
+        if self.file_path.startswith("gs://"):
+            if self.client is None:
+                client = storage.Client()
+            target = Blob.from_string(self.file_path, client=client)
+            self.file = target.open("rb")
+        else:
+            self.file = open(self.file_path, "rb")
+        return self.file
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self.file.closed:
+            self.file.close()
+
+
 def gs_list(gs_path: str, srchstr=None) -> list:
     """
     Return a list of blobs under gs_path

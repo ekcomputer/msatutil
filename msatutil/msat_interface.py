@@ -277,7 +277,7 @@ class msat_collection:
         self.parse_dates(date_range, date_pattern)
 
         self.file_paths = self.file_list
-        self.file_names = [os.path.basename(file_path) for file_path in self.file_list]
+        self.file_names = np.array([os.path.basename(file_path) for file_path in self.file_list])
         self.ids = OrderedDict([(i, file_path) for i, file_path in enumerate(self.file_list)])
         self.ids_rev = {val: key for key, val in self.ids.items()}
         if use_dask:

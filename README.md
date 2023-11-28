@@ -84,24 +84,32 @@ Or using the **mairl3html** console script with a direct file path and the **--s
 
 # Console scripts
 
+**mairls** is a console entry point for listing and subsetting MethaneAIR files from csv tables of metadata
+
+It interfaces with [mair_ls.py](msatutil/mair_ls.py)
+
+Check detailed usage info with
+
+`mairls -h`
+
 **mairl3html** is a console entry point for generating static html plot of L3 mosaic files.
 
 It interfaces with [mair_geoviews.py](msatutil/mair_geoviews.py)
 
 Usage:
 
-`mairl3html l3_path out_path`
+`mairl3html in_path out_path`
 
 Check detailed usage info with
 
 `mairl3html -h`
 
-**l3_path** can be the path to a directory or file, it accepts **gs://** paths
+**in_path** can be the path to a directory or file, it accepts **gs://** paths
 
-The following directory structure is assumed when **l3_path** is a directory:
+The following directory structure is assumed when **in_path** is a directory:
 
 ```
-l3_path
+in_path
 ├── target_dir
 │   ├── resolution_dir
 │   │   └── mosaic_file.nc
@@ -114,7 +122,13 @@ l3_path
         └── mosaic_file.nc
 ```
 
-When **l3_path** is a direct path to a file, **mairl3html** can be given the **--serve** argument to popup the plot with a local webserver (with live regridding)
+When **in_path** is a direct path to a file, **mairl3html** can be given the **--serve** argument to popup the plot with a local webserver (with live regridding)
+
+**in_path** can also be a **.csv** file with metadata on MethaneAIR files, in that case all the arguments of **mairls** can be used with **mairl3html** and the code will
+
+generate static maps for all the files matching the mairls arguments.
+
+Calling **mairl3html** with a **.csv** file and the **--show** argument won't generate plots, it is the same as calling **mairls**
 
 #### Other
 
