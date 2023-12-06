@@ -11,11 +11,17 @@ import geoviews as gv
 from geoviews.tile_sources import EsriImagery
 import panel as pn
 
+import bokeh
+from bokeh.palettes import all_palettes
+from bokeh.models import CustomJS, Slider, Column, Select, Row, LinearColorMapper
+from bokeh.resources import CDN
+from bokeh.embed import file_html
+
 from msatutil.msat_dset import msat_dset, gs_list
 from msatutil.mair_ls import mair_ls
 from msatutil.mair_ls import create_parser as create_ls_parser
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 
 import subprocess
 
@@ -32,7 +38,7 @@ def show_map(
     clim: Optional[Union[Tuple[float, float], bool]] = None,
     alpha: int = 1,
     title: str = "",
-    background_tile=EsriImagery,
+    background_tile_list=[EsriImagery],
     single_panel: bool = False,
 ):
     """
@@ -49,7 +55,7 @@ def show_map(
         clim (Optional[Union[Tuple[float, float],bool]]): z-limits for the colorbar, give False to use dynamic colorbar
         alpha (float): between 0 and 1, sets the opacity of the plotted z field
         title (str): plot title
-        background_tile: the geoviews tile the plot will be made over and that will be in the linked 2nd panel
+        background_tile_list: the geoviews tile the plot will be made over and that will be in the linked 2nd panel
                          if None only makes one panel with no background but with the save tool active
         single_panel (bool): if True, do not add the linked panel with only esri imagery
 
@@ -77,7 +83,7 @@ def show_map(
     if clim is not False:
         raster = raster.opts(clim=clim)
 
-    if (background_tile is not None) and (not single_panel):
+    if (background_tile_list is not None) and (not single_panel):
         # Make a dummy quadmesh that will have alpha=0 in the second panel so we can see the EsriImagery under the data
         # I do this so it will add a colorbar on the second plot so we don't need to think about resizing it
         # just use a small subset of data so it doesn't trigger much computations
@@ -94,19 +100,65 @@ def show_map(
             cmap=cmap,
             colorbar=True,
             alpha=0,
-            title="Esri Imagery",
+            title=background_tile_list[0].__dict__["_name_param_value"],
         )
         if clim is not False:
             dummy.opts(clim=clim)
 
-    if background_tile is None:
+    if background_tile_list is None:
         plot = raster
     elif single_panel:
-        plot = background_tile * raster
+        plot = background_tile_list[-1] * raster
     else:
-        plot = background_tile * (raster + dummy)
+        plot = (background_tile_list[-1] * raster) + (background_tile_list[0] * dummy)
 
     return plot
+
+
+def save_static_plot_with_widgets(out_file: str, plot, alpha: float = 1.0, cmap: str = "viridis"):
+    """
+    Save the output of show_map to a html file
+
+    transform into a bokeh object
+    add an alpha slider and a colormap selector
+    save as an html file
+    """
+
+    bokeh_plot = hv.render(plot, backend="bokeh")
+
+    if type(bokeh_plot) is bokeh.models.plots.GridPlot:
+        glyph = bokeh_plot.children[0][0].renderers[1].glyph
+        # get rid of the dummy legend
+        bokeh_plot.children[0][0].min_border_right = 100
+        bokeh_plot.children[1][0].min_border_right = 100
+        bokeh_plot.children[1][0].right[0].visible = False
+    elif type(bokeh_plot) is bokeh.plotting._figure.figure:
+        glyph = bokeh_plot.renderers[1].glyph
+
+    # alpha slider
+    callback = CustomJS(args={"plot": glyph}, code="plot.global_alpha = cb_obj.value;")
+    alpha_slider = Slider(start=0, end=1.0, step=0.1, value=alpha, title="Heatmap alpha")
+    alpha_slider.js_on_change("value", callback)
+
+    # color palette select
+    palette_dict = {k.lower(): v[256] for k, v in all_palettes.items() if 256 in v}
+    palette_select = Select(
+        options=sorted(list(palette_dict.keys())),
+        value=cmap.lower(),
+        title="Colormap",
+    )
+    callback = CustomJS(
+        args={"glyph": glyph, "palette_dict": palette_dict},
+        code="glyph.color_mapper.palette = palette_dict[cb_obj.value];",
+    )
+    palette_select.js_on_change("value", callback)
+
+    bokeh_layout = Column(bokeh_plot, Row(palette_select, alpha_slider))
+
+    with open(out_file, "w") as out:
+        out.write(file_html(bokeh_layout, CDN, "MethaneAIR map"))
+
+    print(out_file)
 
 
 def do_single_map(
@@ -123,6 +175,7 @@ def do_single_map(
     alpha: float = 1,
     panel_serve: bool = False,
     single_panel: bool = False,
+    background_tile_list: Optional[List[str]] = None,
     num_samples_threshold: Optional[float] = None,
 ) -> None:
     """
@@ -141,6 +194,8 @@ def do_single_map(
     height (int): plot height in pixels
     panel_serve (bool): if True, start an interactive session
     single_panel (bool): if True, do not add the linked panel with only esri imagery
+    background_tile_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
+                                                    for the main (last value) and linked (first value) panels
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     """
     default_html_filename = os.path.basename(data_file).replace(".nc", ".html")
@@ -163,6 +218,14 @@ def do_single_map(
             num_samples = nc["num_samples"][:]
             v[num_samples < num_samples_threshold] = np.nan
 
+    if background_tile_list is not None:
+        tile_dict = {k.lower(): v for k, v in gv.tile_sources.__dict__["tile_sources"].items()}
+        for i, background_tile_name in enumerate(background_tile_list):
+            if background_tile_name.lower() not in tile_dict:
+                background_tile_list[i] = tile_dict["esriimagery"]
+            else:
+                background_tile_list[i] = tile_dict[background_tile_name.lower()]
+
     plot = show_map(
         lon,
         lat,
@@ -174,11 +237,10 @@ def do_single_map(
         height=height,
         alpha=alpha,
         single_panel=single_panel,
+        background_tile_list=background_tile_list,
     )
 
-    hv.save(plot, out_file, backend="bokeh")
-
-    print(out_file)
+    save_static_plot_with_widgets(out_file, plot, alpha=alpha, cmap=cmap)
 
     if panel_serve:
         pn.serve(pn.Column(plot))
@@ -199,6 +261,7 @@ def L3_mosaics_to_html(
     height: int = 750,
     alpha: float = 1,
     single_panel: bool = False,
+    background_tile_list: Optional[List[str]] = None,
     num_samples_threshold: Optional[float] = None,
 ) -> None:
     """
@@ -224,6 +287,8 @@ def L3_mosaics_to_html(
     width (int): plot width in pixels
     height (int): plot height in pixels
     single_panel (bool): if True, do not add the linked panel with only esri imagery
+    background_tile_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
+                                                    for the main (last value) and linked (first value) panels
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     """
     l3_on_gs = l3_dir.startswith("gs://")
@@ -293,6 +358,7 @@ def L3_mosaics_to_html(
                     height=height,
                     alpha=alpha,
                     single_panel=single_panel,
+                    background_tile_list=background_tile_list,
                     num_samples_threshold=num_samples_threshold,
                 )
 
@@ -398,6 +464,14 @@ def create_plot_parser(**kwargs):
         help="if given, do not add the linked panel with only ESRI imagery (e.g. with alpha<1)",
     )
     plot_parser.add_argument(
+        "--background-tile",
+        default=["EsriImagery"],
+        nargs="*",
+        help="background tile name from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)."
+        "Can take up to 2 values uses for the main (last value) and linked (first value) panels."
+        "If only one value is given it is used for both panels.",
+    )
+    plot_parser.add_argument(
         "--filter-num-samples",
         default=None,
         type=float,
@@ -499,6 +573,7 @@ def main():
                 alpha=args.alpha,
                 panel_serve=False,
                 single_panel=args.single_panel,
+                background_tile_list=args.background_tile,
                 num_samples_threshold=args.filter_num_samples,
             )
 
@@ -518,6 +593,7 @@ def main():
             alpha=args.alpha,
             panel_serve=args.serve,
             single_panel=args.single_panel,
+            background_tile_list=args.background_tile,
             num_samples_threshold=args.filter_num_samples,
         )
     else:
@@ -537,6 +613,7 @@ def main():
             height=args.height,
             alpha=args.alpha,
             single_panel=args.single_panel,
+            background_tile_list=args.background_tile,
             num_samples_threshold=args.filter_num_samples,
         )
 
