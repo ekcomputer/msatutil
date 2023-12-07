@@ -8,13 +8,14 @@ import inspect
 
 os.environ["BOKEH_PY_LOG_LEVEL"] = "error"
 import bokeh
-from bokeh.palettes import all_palettes
 from bokeh.models import CustomJS, Slider, Column, Select, Row
 from bokeh.resources import CDN
 from bokeh.embed import file_html
 
 import holoviews as hv
 from holoviews.operation.datashader import rasterize
+from holoviews.plotting import list_cmaps
+from holoviews.plotting.util import process_cmap
 import geoviews as gv
 from geoviews.tile_sources import EsriImagery
 import panel as pn
@@ -142,7 +143,12 @@ def save_static_plot_with_widgets(out_file: str, plot, alpha: float = 1.0, cmap:
     alpha_slider.js_on_change("value", callback)
 
     # color palette select
-    palette_dict = {k.lower(): v[256] for k, v in all_palettes.items() if 256 in v}
+    uniform_sequential_palettes = list_cmaps(category="Uniform Sequential")
+    sequential_palettes = list_cmaps(category="Sequential")
+    palette_dict = {k.lower() + " (u)": process_cmap(k) for k in uniform_sequential_palettes}
+    for k in set(sequential_palettes).difference(uniform_sequential_palettes):
+        palette_dict[k.lower()] = process_cmap(k)
+
     palette_select = Select(
         options=sorted(list(palette_dict.keys())),
         value=cmap.lower(),
