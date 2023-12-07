@@ -5,17 +5,19 @@ import os
 import numpy as np
 import argparse
 import inspect
-import holoviews as hv
-from holoviews.operation.datashader import rasterize
-import geoviews as gv
-from geoviews.tile_sources import EsriImagery
-import panel as pn
 
+os.environ["BOKEH_PY_LOG_LEVEL"] = "error"
 import bokeh
 from bokeh.palettes import all_palettes
 from bokeh.models import CustomJS, Slider, Column, Select, Row
 from bokeh.resources import CDN
 from bokeh.embed import file_html
+
+import holoviews as hv
+from holoviews.operation.datashader import rasterize
+import geoviews as gv
+from geoviews.tile_sources import EsriImagery
+import panel as pn
 
 from msatutil.msat_dset import msat_dset, gs_list
 from msatutil.mair_ls import mair_ls
