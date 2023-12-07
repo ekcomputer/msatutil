@@ -175,7 +175,7 @@ def do_single_map(
     alpha: float = 1,
     panel_serve: bool = False,
     single_panel: bool = False,
-    background_tile_list: Optional[List[str]] = None,
+    background_tile_name_list: Optional[List[str]] = None,
     num_samples_threshold: Optional[float] = None,
 ) -> None:
     """
@@ -194,7 +194,7 @@ def do_single_map(
     height (int): plot height in pixels
     panel_serve (bool): if True, start an interactive session
     single_panel (bool): if True, do not add the linked panel with only esri imagery
-    background_tile_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
+    background_tile_name_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
                                                     for the main (last value) and linked (first value) panels
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     """
@@ -218,9 +218,10 @@ def do_single_map(
             num_samples = nc["num_samples"][:]
             v[num_samples < num_samples_threshold] = np.nan
 
-    if background_tile_list is not None:
+    if background_tile_name_list is not None:
         tile_dict = {k.lower(): v for k, v in gv.tile_sources.__dict__["tile_sources"].items()}
-        for i, background_tile_name in enumerate(background_tile_list):
+        background_tile_list = ["" for i in background_tile_name_list]
+        for i, background_tile_name in enumerate(background_tile_name_list):
             if background_tile_name.lower() not in tile_dict:
                 background_tile_list[i] = tile_dict["esriimagery"]
             else:
@@ -261,7 +262,7 @@ def L3_mosaics_to_html(
     height: int = 750,
     alpha: float = 1,
     single_panel: bool = False,
-    background_tile_list: Optional[List[str]] = None,
+    background_tile_name_list: Optional[List[str]] = None,
     num_samples_threshold: Optional[float] = None,
 ) -> None:
     """
@@ -287,7 +288,7 @@ def L3_mosaics_to_html(
     width (int): plot width in pixels
     height (int): plot height in pixels
     single_panel (bool): if True, do not add the linked panel with only esri imagery
-    background_tile_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
+    background_tile_name_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
                                                     for the main (last value) and linked (first value) panels
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     """
@@ -358,7 +359,7 @@ def L3_mosaics_to_html(
                     height=height,
                     alpha=alpha,
                     single_panel=single_panel,
-                    background_tile_list=background_tile_list,
+                    background_tile_name_list=background_tile_name_list,
                     num_samples_threshold=num_samples_threshold,
                 )
 
@@ -573,7 +574,7 @@ def main():
                 alpha=args.alpha,
                 panel_serve=False,
                 single_panel=args.single_panel,
-                background_tile_list=args.background_tile,
+                background_tile_name_list=args.background_tile,
                 num_samples_threshold=args.filter_num_samples,
             )
 
@@ -593,7 +594,7 @@ def main():
             alpha=args.alpha,
             panel_serve=args.serve,
             single_panel=args.single_panel,
-            background_tile_list=args.background_tile,
+            background_tile_name_list=args.background_tile,
             num_samples_threshold=args.filter_num_samples,
         )
     else:
@@ -613,7 +614,7 @@ def main():
             height=args.height,
             alpha=args.alpha,
             single_panel=args.single_panel,
-            background_tile_list=args.background_tile,
+            background_tile_name_list=args.background_tile,
             num_samples_threshold=args.filter_num_samples,
         )
 
