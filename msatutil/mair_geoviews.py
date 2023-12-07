@@ -100,7 +100,6 @@ def show_map(
             cmap=cmap,
             colorbar=True,
             alpha=0,
-            title=background_tile_list[0].__dict__["_name_param_value"],
         )
         if clim is not False:
             dummy.opts(clim=clim)
