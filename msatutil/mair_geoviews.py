@@ -13,7 +13,7 @@ import panel as pn
 
 import bokeh
 from bokeh.palettes import all_palettes
-from bokeh.models import CustomJS, Slider, Column, Select, Row, LinearColorMapper
+from bokeh.models import CustomJS, Slider, Column, Select, Row
 from bokeh.resources import CDN
 from bokeh.embed import file_html
 
