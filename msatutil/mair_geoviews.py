@@ -43,6 +43,7 @@ def show_map(
     title: str = "",
     background_tile_list=[EsriImagery],
     single_panel: bool = False,
+    pixel_ratio: int = 1,
 ):
     """
     Make a geoviews map of z overlayed on background_tile
@@ -61,6 +62,7 @@ def show_map(
         background_tile_list: the geoviews tile the plot will be made over and that will be in the linked 2nd panel
                          if None only makes one panel with no background but with the save tool active
         single_panel (bool): if True, do not add the linked panel with only esri imagery
+        pixel_ratio (int): the initial map (and the static maps) will have width x height pixels, this multiplies the number of pixels
 
     Outputs:
         geoviews figure
@@ -74,7 +76,7 @@ def show_map(
         std_z = np.nanstd(z, ddof=1)
         clim = (mean_z - 3 * std_z, mean_z + 3 * std_z)
 
-    raster = rasterize(quad, width=width, height=height).opts(
+    raster = rasterize(quad, width=width, height=height, pixel_ratio=pixel_ratio).opts(
         width=width,
         height=height,
         cmap=cmap,
@@ -184,6 +186,7 @@ def do_single_map(
     single_panel: bool = False,
     background_tile_name_list: Optional[List[str]] = None,
     num_samples_threshold: Optional[float] = None,
+    pixel_ratio: int = 1,
 ) -> None:
     """
     Save a html plot of var from data_file
@@ -204,6 +207,7 @@ def do_single_map(
     background_tile_name_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
                                                     for the main (last value) and linked (first value) panels
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
+    pixel_ratio (int): the initial map (and the static maps) will have width x height pixels, this multiplies the number of pixels
     """
     default_html_filename = os.path.basename(data_file).replace(".nc", ".html")
     if out_path is None:
@@ -246,6 +250,7 @@ def do_single_map(
         alpha=alpha,
         single_panel=single_panel,
         background_tile_list=background_tile_list,
+        pixel_ratio=pixel_ratio,
     )
 
     save_static_plot_with_widgets(out_file, plot, alpha=alpha, cmap=cmap)
@@ -271,6 +276,7 @@ def L3_mosaics_to_html(
     single_panel: bool = False,
     background_tile_name_list: Optional[List[str]] = None,
     num_samples_threshold: Optional[float] = None,
+    pixel_ratio: int = 1,
 ) -> None:
     """
     l3_dir: full path to the L3 directory, assumes the following directory structure
@@ -298,6 +304,7 @@ def L3_mosaics_to_html(
     background_tile_name_list (Optional[List[str]]): name of the background tile from https://holoviews.org/reference/elements/bokeh/Tiles.html (case insensitive)
                                                     for the main (last value) and linked (first value) panels
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
+    pixel_ratio (int): the static maps will have width x height pixels, this multiplies the number of pixels
     """
     l3_on_gs = l3_dir.startswith("gs://")
     if l3_on_gs:
@@ -368,6 +375,7 @@ def L3_mosaics_to_html(
                     single_panel=single_panel,
                     background_tile_name_list=background_tile_name_list,
                     num_samples_threshold=num_samples_threshold,
+                    pixel_ratio=pixel_ratio,
                 )
 
     if html_index:
@@ -485,6 +493,12 @@ def create_plot_parser(**kwargs):
         type=float,
         help="if used with L3 files, filter out data with num_samples<filter_num_samples",
     )
+    plot_parser.add_argument(
+        "--pixel-ratio",
+        default=1,
+        type=int,
+        help="Resolution of the static plots (or initial image with --serve) will be (width*height)*pixel_ratio",
+    )
     return plot_parser
 
 
@@ -535,7 +549,7 @@ def main():
     args = parser.parse_args()
 
     if args.dynamic_clim and args.clim_bounds is not None:
-        raise ("Cannot give both --clim-bounds and --dynamic-clim")
+        raise Exception("Cannot give both --clim-bounds and --dynamic-clim")
     elif args.dynamic_clim:
         clim = False
     elif args.clim_bounds is not None:
@@ -583,6 +597,7 @@ def main():
                 single_panel=args.single_panel,
                 background_tile_name_list=args.background_tile,
                 num_samples_threshold=args.filter_num_samples,
+                pixel_ratio=args.pixel_ratio,
             )
 
     elif os.path.splitext(args.in_path)[1] != "":
@@ -603,6 +618,7 @@ def main():
             single_panel=args.single_panel,
             background_tile_name_list=args.background_tile,
             num_samples_threshold=args.filter_num_samples,
+            pixel_ratio=args.pixel_ratio,
         )
     else:
         # If in_path point to a directory
@@ -623,6 +639,7 @@ def main():
             single_panel=args.single_panel,
             background_tile_name_list=args.background_tile,
             num_samples_threshold=args.filter_num_samples,
+            pixel_ratio=args.pixel_ratio,
         )
 
 
