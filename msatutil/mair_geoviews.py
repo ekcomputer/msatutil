@@ -575,11 +575,18 @@ def main():
         if not os.path.exists(args.out_path):
             os.makedirs(args.out_path)
         for i, row in df.iterrows():
-            title = f'{row["flight_name"].upper()} {row["production_operation"]}; {row["level3_target_name"]}; {label}'
-            out_path = os.path.join(
-                args.out_path,
-                f'{row["flight_name"]}_{row["production_operation"]}_{row["aggregation"]}_{row["level3_resolution"]}_{row["level3_target_name"]}.html',
-            )
+            if "level3_target_name" in row:
+                title = f'{row["flight_name"].upper()} {row["production_operation"]}; {row["level3_target_name"]}; {label}'
+                out_path = os.path.join(
+                    args.out_path,
+                    f'{row["flight_name"]}_{row["production_operation"]}_{row["aggregation"]}_{row["level3_resolution"]}_{row["level3_target_name"]}.html',
+                )
+            else:
+                title = f'{row["flight_name"].upper()} {row["production_operation"]}; {label}'
+                out_path = os.path.join(
+                    args.out_path,
+                    f'{row["flight_name"]}_{row["production_operation"]}_{row["aggregation"]}.html',
+                )
             print(row["uri"])
             do_single_map(
                 row["uri"],
