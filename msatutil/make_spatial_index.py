@@ -70,8 +70,8 @@ def validDataArea2Gdf(ds, simplify=None):
         raise ValueError(
             "Geospatial resolutions of latitude and longitude do not match or value needs to be specified")
 
-    transform = from_origin(float(ds.geospatial_lon_min), float(ds.geospatial_lat_max), res,
-                            res)  # Adjust these values
+    transform = from_origin(float(ds.geospatial_lon_min), float(ds.geospatial_lat_min), res,
+                            -res)  # Adjust these values
 
     data_variable = ds.variables['xch4'][:]
     valid_data_mask = ~np.isnan(data_variable)
