@@ -26,6 +26,8 @@ else:  # on GCS
                      storage_options={'token': 'cloud'})
     working_dir = '~/msat_spatial_idx'
 catalogue_shp_out_pth = os.path.join(working_dir, 'L3_mosaics_20240208.shp')
+catalogue_tmp_out_pth = os.path.join(
+    working_dir, 'L3_mosaics_20240208_tmp.csv')
 
 ## TODO: problem is google-auth installation is not working. (Can't import gcsfs). I had google-auth 1.35 installed, then installed 2.28 with pip, but it had a dependency conflict, so I uninstalled. Tried to install with mamba, but it tells me it is already installed, even though import google-auth fails...
 
@@ -108,6 +110,11 @@ if __name__ == '__main__':
         ds = msat_dset(gs_pth)
         geom = validDataArea2Gdf(ds, simplify=0.001)
         df.at[index, 'geometry'] = geom
+
+        ## Save temporarily
+        if index % 10 == 0:
+            df.to_csv(catalogue_tmp_out_pth)
+            print('\t> Saving checkpoint.')
 
     gdf = gpd.GeoDataFrame(df, geometry='geometry',
                            crs='EPSG:4326')
