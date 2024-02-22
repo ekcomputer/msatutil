@@ -70,7 +70,7 @@ if __name__ == '__main__':
     L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L3_mosaics.csv'
     os_platform = platform.platform()
     load_from_chkpt = True
-    simplify_tol = 0.01 # in map units (deg)
+    simplify_tol = None # in map units (deg)
 
     ## Load
     if simplify_tol is not None:
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     for index, row in df.iterrows():
         gs_pth = row['uri']
         if 'geometry' in df.columns:  # loaded from checkpoint
-            if  df.at[index, 'geometry'] is not None: #isinstance(df.at[index, 'geometry'], str):
+            if  pd.notnull(df.at[index, 'geometry']): 
                 print(f"Geometry exists for {gs_pth.split('/mosaic/')[-1]}")
                 continue  # Skip if geometry is already present
 
