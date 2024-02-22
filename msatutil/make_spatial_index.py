@@ -9,6 +9,13 @@ from rasterio.features import shapes
 from shapely.geometry import MultiPolygon, shape
 from rasterio.transform import from_origin
 
+## Use pyogrio for reading/writing large shapefiles, if available
+try:
+    import pyogrio
+    engine = 'pyogrio'
+except:
+    engine = 'fiona'
+
 ## Functions
 
 def validDataArea2Gdf(ds, simplify=None):
@@ -70,7 +77,8 @@ if __name__ == '__main__':
     L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L3_mosaics.csv'
     os_platform = platform.platform()
     load_from_chkpt = True
-    simplify_tol = 0.01 # in map units (deg)
+    simplify_tol = None # in map units (deg)
+    save_frequency = 50
 
     ## Load
     if simplify_tol is not None:
@@ -81,7 +89,7 @@ if __name__ == '__main__':
         working_dir = '/Volumes/metis/MAIR/Spatial_catalogue' 
         catalogue_shp_out_pth = os.path.join(working_dir, f'L3_mosaics_20240208{tol_str}.shp')
         if load_from_chkpt and os.path.exists(os.path.expanduser(catalogue_shp_out_pth)):
-            df = gpd.read_file(catalogue_shp_out_pth, driver='ESRI Shape')
+            df = gpd.read_file(catalogue_shp_out_pth, engine=engine)
         else:
             df = pd.read_csv(L3_mosaics_catalogue_pth)            
         df = df[:3]  # Testing
@@ -89,7 +97,7 @@ if __name__ == '__main__':
         working_dir = '~/msat_spatial_idx'
         catalogue_shp_out_pth = os.path.join(working_dir, f'L3_mosaics_20240208{tol_str}.shp')
         if load_from_chkpt and os.path.exists(os.path.expanduser(catalogue_shp_out_pth)):
-            df = gpd.read_file(catalogue_shp_out_pth, driver='ESRI Shape')
+            df = gpd.read_file(catalogue_shp_out_pth, engine=engine)
         else:
             df = pd.read_csv(L3_mosaics_catalogue_pth,
                             storage_options={'token': 'cloud'})
@@ -98,7 +106,7 @@ if __name__ == '__main__':
     for index, row in df.iterrows():
         gs_pth = row['uri']
         if 'geometry' in df.columns:  # loaded from checkpoint
-            if  df.at[index, 'geometry'] is not None: #isinstance(df.at[index, 'geometry'], str):
+            if  pd.notnull(df.at[index, 'geometry']): 
                 print(f"Geometry exists for {gs_pth.split('/mosaic/')[-1]}")
                 continue  # Skip if geometry is already present
 
@@ -108,8 +116,8 @@ if __name__ == '__main__':
         df.at[index, 'geometry'] = geom
 
         ## Save intermittently
-        if (index % 50 == 0) or index == len(df):
-            if index % 10 == 0:
+        if (index % save_frequency == 0) or (index == len(df) - 1):
+            if index % save_frequency == 0:
                 print('\t> Saving checkpoint.')
             if index == len(df) - 1:
                 print('\t> Saving final.')
@@ -125,6 +133,7 @@ if __name__ == '__main__':
                     gdf[col] = gdf[col].astype(str)
             
             ## Save as shapefile and geojson to disk
-            gdf.to_file(catalogue_shp_out_pth, driver='ESRI Shapefile')
-            gdf.to_file(catalogue_shp_out_pth.replace('.shp', '.geojson'))
+            gdf.to_file(catalogue_shp_out_pth, engine=engine)
+            if simplify_tol is not None:
+                gdf.to_file(catalogue_shp_out_pth.replace('.shp', '.geojson'))
     print('Finished creating mask shapefile.')
