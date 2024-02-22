@@ -6,18 +6,16 @@ import pandas as pd
 import xarray as xr
 import geopandas as gpd
 from rasterio.features import shapes
-from shapely.geometry import Polygon, MultiPolygon, shape
+from shapely.geometry import MultiPolygon, shape
 from rasterio.transform import from_origin
-'''
-TODO:
-* Fix if branches to make less redundant
-'''
 
 ## Functions
 
 def validDataArea2Gdf(ds, simplify=None):
     '''
     This function converts valid data areas from a msatutil.msat_dset.msat_dset (Netcdf4 Dataset) into a MultiPolygon Shapefly geometry. It takes about an hour to run for 1,000 mosaics.
+
+    See https://github.com/methanesat-org/sandbox-viz-app/blob/main/src/make_geotiff_L3.py for a similar script that converts netcdf to geotiff.
 
     Parameters:
     - ds: Netcdf4 Dataset object containing the data
@@ -37,6 +35,7 @@ def validDataArea2Gdf(ds, simplify=None):
     Examples:
     validDataArea2Gdf(ds, simplify=None)
     '''
+
     # Define the transform and metadata for the temporary raster
     if ds.geospatial_lat_resolution == ds.geospatial_lon_resolution == '1/3 arcseconds':
         res = 1 / 60 / 60 / 3
@@ -45,17 +44,14 @@ def validDataArea2Gdf(ds, simplify=None):
     else:
         raise ValueError(
             "Geospatial resolutions of latitude and longitude do not match or value needs to be specified")
-
     transform = from_origin(float(ds.geospatial_lon_min), float(ds.geospatial_lat_min), res,
                             -res)  # Adjust these values
-
     data_variable = ds.variables['xch4'][:]
     valid_data_mask = ~np.isnan(data_variable)
 
     ## Convert to geometry
     shapes_gen = shapes((~valid_data_mask.mask).astype(
         'uint8'), transform=transform)
-
     polygons = []
     for poly_shape, value in shapes_gen:
         if value == 1:  # Valid data value
@@ -71,14 +67,12 @@ def validDataArea2Gdf(ds, simplify=None):
 
 if __name__ == '__main__':
     ## I/O
-    # L3_mosaics_catalogue_pth = '/Volumes/metis/MAIR/Index/L3_mosaics.xlsx'
     L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L3_mosaics.csv'
     os_platform = platform.platform()
     load_from_chkpt = True
     simplify_tol = 0.01 # in map units (deg)
 
     ## Load
-    # gdf = pd.read_excel(L3_mosaics_catalogue_pth)
     if simplify_tol is not None:
         tol_str = f'_tol{simplify_tol}'
     else:
@@ -115,10 +109,9 @@ if __name__ == '__main__':
 
         ## Save intermittently
         if (index % 50 == 0) or index == len(df):
-            # df.to_csv(catalogue_tmp_out_pth)
             if index % 10 == 0:
                 print('\t> Saving checkpoint.')
-            if index == len(df):
+            if index == len(df) - 1:
                 print('\t> Saving final.')
             gdf = gpd.GeoDataFrame(df, geometry='geometry',
                                 crs='EPSG:4326')
