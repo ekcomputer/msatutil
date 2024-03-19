@@ -44,6 +44,7 @@ def show_map(
     background_tile_list=[EsriImagery],
     single_panel: bool = False,
     pixel_ratio: int = 1,
+    active_tools=['pan', 'wheel_zoom'],
 ):
     """
     Make a geoviews map of z overlayed on background_tile
