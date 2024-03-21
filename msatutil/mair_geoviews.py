@@ -64,6 +64,7 @@ def show_map(
                          if None only makes one panel with no background but with the save tool active
         single_panel (bool): if True, do not add the linked panel with only esri imagery
         pixel_ratio (int): the initial map (and the static maps) will have width x height pixels, this multiplies the number of pixels
+        active_tools (list[str]): Active map tools for mouse use (default: ['pan', 'wheel_zoom'])
 
     Outputs:
         geoviews figure
@@ -84,6 +85,7 @@ def show_map(
         colorbar=True,
         title=title,
         alpha=alpha,
+        active_tools=active_tools,
     )
 
     if clim is not False:
