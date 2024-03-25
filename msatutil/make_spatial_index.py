@@ -127,10 +127,14 @@ def level2Netcdf2Geom(ds, decimal_rounding=2, simplify=None):
                                                         # crs="EPSG:4326"
                         )
     outline= gpd.GeoDataFrame(geometry=gdf.buffer(res)).dissolve()
-    multipolygon = outline['geometry'].values[0] # clunky
-    if simplify is not None:
-        multipolygon = simplifyWithCatch(multipolygon, simplify)
-    return multipolygon
+    if len(outline) == 0:  # empty bc no data at all
+        return None
+    else:
+        # clunky, can try with outline.__geo_interface__ instead
+        multipolygon = outline['geometry'].values[0]
+        if simplify is not None:
+            multipolygon = simplifyWithCatch(multipolygon, simplify)
+        return multipolygon
 
 
 def validDataArea2Geom(ds, simplify=None):
