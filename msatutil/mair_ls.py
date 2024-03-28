@@ -50,13 +50,21 @@ def mair_ls(
     if (flight_date is not None) and ("flight_date" in df.columns):
         df = df.loc[df["flight_date"] == pd.to_datetime(flight_date)]
 
+    if latest and "production_timestamp" in df.columns:
+        sorted_production_operation = list(
+            df.sort_values(by="production_timestamp")
+            .groupby("production_operation")
+            .first()
+            .sort_values(by="production_timestamp")
+            .reset_index()["production_operation"]
+        )
+        production_operation = sorted_production_operation[-1]
+        df = df.loc[df["production_operation"] == production_operation]
+
     if timestamp is not None:
         timestamp = pd.to_datetime(timestamp)
 
-    if latest and "production_timestamp" in df.columns:
-        timestamp = df["production_timestamp"].max()
-
-    if ((timestamp is not None) or latest) and "production_timestamp" in df.columns:
+    if timestamp is not None and "production_timestamp" in df.columns:
         df = df.loc[df["production_timestamp"] == timestamp]
 
     time_filter_pattern = r"([<>]=?|[=!]=)\s*(.*)"
@@ -83,7 +91,7 @@ def mair_ls(
         for i in df.uri.tolist():
             print(i)
 
-    return df
+    return df.reset_index().drop(columns=["index"])
 
 
 def create_parser(**kwargs):
