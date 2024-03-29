@@ -3,6 +3,7 @@ import os
 import argparse
 import traceback
 from msatutil.msat_dset import msat_dset
+from msatutil.mair_ls import mair_ls
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -191,7 +192,28 @@ def validDataArea2Geom(ds, simplify=None):
     return multipolygon
 
 
-def save_geojson(L3_mosaics_catalogue_pth: str, working_dir: str, load_from_chkpt: bool = True, simplify_tol: float = None, save_frequency: int = 50, out_path: str = None, l2_data=False, decimal_rounding=2) -> list[str]:
+def load_catalogue_csv(df_pth, latest=False) -> pd.DataFrame:
+    # storage_options={'token': 'cloud'}
+    df = pd.read_csv(L3_mosaics_catalogue_pth)
+    if latest == False:
+        return df
+    # if loaded from ESRI shapefile with max field length of 10
+    # if isinstance(df, gpd.GeoDataFrame):
+    #     flight_name_key = 'flight_nam'
+    # else:
+    flight_name_key = 'flight_name'
+    unq_flights = np.unique(df[flight_name_key])
+    latest_segments_concat = []  # init
+    for flight in unq_flights:
+        latest_segments = mair_ls(
+            df_pth, flight_name=flight, show=False, latest=True)
+        latest_segments_concat.append(latest_segments)
+    df_filtered = pd.concat(latest_segments_concat, ignore_index=True)
+    assert len(df_filtered) <= len(df)
+    return df_filtered
+
+
+def save_geojson(L3_mosaics_catalogue_pth: str, working_dir: str, load_from_chkpt: bool = True, simplify_tol: float = None, save_frequency: int = 50, out_path: str = None, l2_data=False, decimal_rounding=2, latest=False) -> list[str]:
     '''
     save_geojson Calls validDataArea2Gdf and writes out as an ESRI shapefile and a geojson (if polygon simplification is used).
 
@@ -216,6 +238,8 @@ def save_geojson(L3_mosaics_catalogue_pth: str, working_dir: str, load_from_chkp
         Whether filepaths are for L2 data.
     decimal_rounding : int, optional (2)
         Number of lat/long decimal places to use for binning L2 data. Default is 2 (ignored if l2_data is False).
+    latest : bool, optional (False)
+        If true, passes `latest=True` arg to mair_ls.py in order to only process the most recent versions
 
     Returns
     -------
@@ -247,10 +271,11 @@ def save_geojson(L3_mosaics_catalogue_pth: str, working_dir: str, load_from_chkp
         catalogue_geojson_out_pth = catalogue_shp_out_pth.replace(
             '.shp', '.geojson')
         if load_from_chkpt and os.path.exists(os.path.expanduser(catalogue_shp_out_pth)):
+            # Assumes if loading from .shp, data is already filtered for latest, if desired
             df = gpd.read_file(catalogue_shp_out_pth, engine=engine)
         else:
-            # storage_options={'token': 'cloud'}
-            df = pd.read_csv(L3_mosaics_catalogue_pth)
+            df = load_catalogue_csv(L3_mosaics_catalogue_pth, latest)
+
         ## Loop
         for index, row in df.iterrows():
             gs_pth = row['uri']
@@ -325,7 +350,8 @@ def main():
                         help="Whether filepaths are for L2 data.")
     parser.add_argument("-r", "--decimal_rounding", type=int, default=2,
                         help="Number of lat/long decimal places to use for binning L2 data. (ignored if l2_data is False)")
-
+    parser.add_argument("-a", "--latest", type=bool, default=False,
+                        help="If true, passes `latest=True` arg to mair_ls.py in order to only process the most recent versions")
     args = parser.parse_args()
 
     # Call the function with the parsed arguments
@@ -338,13 +364,14 @@ def main():
         out_path=args.out_path,
         l2_data=args.l2_data,
         decimal_rounding=args.decimal_rounding,
+        latest=args.latest,
     )
 
 
 if __name__ == '__main__':
-    main()
+    # main()
 
-    # ## Testing in debugger
+    # ## Testing in debugger for L2
     # L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L2_pp.csv'
     # load_from_chkpt = True
     # simplify_tol = 0.01
@@ -356,3 +383,18 @@ if __name__ == '__main__':
     
     # L3_mosaics_catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data)
     # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
+
+    # ## Testing in debugger for L3_segments
+    L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L3_segment.csv'
+    load_from_chkpt = False
+    simplify_tol = 0.001
+    # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
+    working_dir = '/Volumes/metis/MAIR/Spatial_catalogue'  # '~/msat_spatial_idx'
+    save_frequency = 3  # for testingload_from_chkpt=True
+    out_path = 'test_march_29'
+    l2_data = False
+    latest = False  # True
+    out_pth_shp, out_pth_geojson = save_geojson(
+
+        L3_mosaics_catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
+    print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
