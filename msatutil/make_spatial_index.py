@@ -350,8 +350,8 @@ def main():
                         help="Whether filepaths are for L2 data.")
     parser.add_argument("-r", "--decimal_rounding", type=int, default=2,
                         help="Number of lat/long decimal places to use for binning L2 data. (ignored if l2_data is False)")
-    parser.add_argument("-a", "--latest", type=bool, default=False,
-                        help="If true, passes `latest=True` arg to mair_ls.py in order to only process the most recent versions")
+    parser.add_argument("-a", "--latest", action="store_true",
+                        help="Passes `latest=True` arg to mair_ls.py in order to only process the most recent versions")
     args = parser.parse_args()
 
     # Call the function with the parsed arguments
