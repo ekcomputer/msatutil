@@ -369,7 +369,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
+    main()
 
     # ## Testing in debugger for L2
     # L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L2_pp.csv'
@@ -385,16 +385,16 @@ if __name__ == '__main__':
     # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
 
     # ## Testing in debugger for L3_segments
-    L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L3_segment.csv'
-    load_from_chkpt = False
-    simplify_tol = 0.001
-    # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
-    working_dir = '/Volumes/metis/MAIR/Spatial_catalogue'  # '~/msat_spatial_idx'
-    save_frequency = 3  # for testingload_from_chkpt=True
-    out_path = 'test_march_29'
-    l2_data = False
-    latest = False  # True
-    out_pth_shp, out_pth_geojson = save_geojson(
+    # L3_mosaics_catalogue_pth = 'gs://msat-dev-science-data/L3_segment.csv'
+    # load_from_chkpt = False
+    # simplify_tol = 0.001
+    # # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
+    # working_dir = '/Volumes/metis/MAIR/Spatial_catalogue'  # '~/msat_spatial_idx'
+    # save_frequency = 3  # for testingload_from_chkpt=True
+    # out_path = 'test_march_29'
+    # l2_data = False
+    # latest = False  # True
+    # out_pth_shp, out_pth_geojson = save_geojson(
 
-        L3_mosaics_catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
-    print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
+    #     L3_mosaics_catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
+    # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
