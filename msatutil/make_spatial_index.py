@@ -359,7 +359,7 @@ def main():
     parser.add_argument("-r", "--decimal_rounding", type=int, default=2,
                         help="Number of lat/long decimal places to use for binning L2 data. (ignored if l2_data is False)")
     parser.add_argument("-a", "--latest", action="store_true",
-                        help="Only process the most recent product versions based on mair_ls.py")
+                        help="Passes `latest=True` arg to mair_ls.py in order to only process the most recent versions")
     args = parser.parse_args()
 
     # Call the function with the parsed arguments
