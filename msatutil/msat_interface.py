@@ -716,6 +716,8 @@ class msat_collection:
             x[np.greater(x, 1e29)] = np.nan
 
         x_slices = [slice(None) for i in range(len(x.shape))]
+        original_ndim = len(x_slices)
+        reduced = False
         if option is not None:
             option_axis = var_dim_map[option_axis_dim]
             if self.use_dask:
@@ -723,11 +725,14 @@ class msat_collection:
             else:
                 x = getattr(np, option)(x, axis=option_axis)
             x_slices = [slice(None) for i in range(len(x.shape))]
+            reduced = len(x_slices) < original_ndim
         elif (extra_id is not None) and (extra_id_dim is not None):
             extra_id_dim_axis = var_dim_map[extra_id_dim]
             x_slices[extra_id_dim_axis] = extra_id
         if use_valid_xtrack and "xtrack" in var_dim_map:
             xtrack_dim_axis = var_dim_map["xtrack"]
+            if reduced and option_axis < xtrack_dim_axis:
+                xtrack_dim_axis -= 1
             x_slices[xtrack_dim_axis] = self.valid_xtrack
         x = x[tuple(x_slices)]
 
