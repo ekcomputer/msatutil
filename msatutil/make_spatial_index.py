@@ -346,7 +346,7 @@ def main():
                         help="Intermediate saving frequency every 'n' files. High number disables it. Default: 50.")
     parser.add_argument("-o", "--out_path", type=str, default=None,
                         help="Output path for the file, with extensions replaced. Default: Basename of catalogue_pth.")
-    parser.add_argument("-d", "--l2_data", type=str, default=True,
+    parser.add_argument("-d", "--l2_data", type=str, default=False,
                         help="Whether filepaths are for L2 data.")
     parser.add_argument("-r", "--decimal_rounding", type=int, default=2,
                         help="Number of lat/long decimal places to use for binning L2 data. (ignored if l2_data is False)")
