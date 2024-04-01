@@ -50,6 +50,9 @@ def mair_ls(
     if (flight_date is not None) and ("flight_date" in df.columns):
         df = df.loc[df["flight_date"] == pd.to_datetime(flight_date)]
 
+    if df.index.size == 0:
+        return df.reset_index().drop(columns=["index"])
+
     if latest and "production_timestamp" in df.columns:
         sorted_production_operation = list(
             df.sort_values(by="production_timestamp")
