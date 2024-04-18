@@ -419,11 +419,11 @@ class msat_collection:
             self.start_dates = None
             self.end_dates = None
 
-    def get_valid_xtrack(self):
+    def get_valid_xtrack(self, varpath: Optional[str] = None):
         """
         Get the valid cross track indices
         """
-        return self.msat_files[self.ids[0]].get_valid_xtrack()
+        return self.msat_files[self.ids[0]].get_valid_xtrack(varpath)
 
     def get_valid_rad(self):
         """

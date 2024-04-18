@@ -421,7 +421,15 @@ class msat_nc:
         elif self.is_l2:
             longitude_varpath = "Level1/Longitude"
 
-        if self.is_l2:
+        if varpath is not None:
+            var_dim_map = self.get_dim_map(varpath)
+            atrack_axis = var_dim_map["atrack"]
+            valid_xtrack = np.where(
+                ~np.isnan(
+                    np.nanmedian(self.nc_dset[varpath][:], axis=atrack_axis).squeeze()
+                )
+            )[0]            
+        elif self.is_l2:
             var_dim_map = self.get_dim_map(longitude_varpath)
             atrack_axis = var_dim_map["atrack"]
             valid_xtrack = np.where(
