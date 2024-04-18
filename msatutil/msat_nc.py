@@ -36,10 +36,11 @@ class msat_nc:
         self.is_l3 = "Provenance" in self.nc_dset.groups and hasattr(
             self.nc_dset["Provenance"], "msat_level3"
         )
+        self.is_labels = "cloud_mask" in self.nc_dset.variables
         self.is_postproc = "product_co2proxy" in self.nc_dset.groups
         self.is_l2_met = "Surface_Band1" in self.nc_dset.groups
         self.is_l2 = not self.is_l2_met and (("Level1" in self.nc_dset.groups) or self.is_postproc)
-        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc, self.is_l3]
+        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc, self.is_l3, self.is_labels]
         self.varpath_list = None
 
         # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
@@ -116,6 +117,7 @@ class msat_nc:
     def __str__(self) -> str:
         return f"""msat_nc:
         use_dask: {self.use_dask}
+        is_labels: {self.is_labels}
         is_l1: {self.is_l1}
         is_l2: {self.is_l2}
         is_l3: {self.is_l3}
@@ -405,11 +407,13 @@ class msat_nc:
 
         return var_dim_map
 
-    def get_valid_xtrack(self) -> slice:
+    def get_valid_xtrack(self, varpath: Optional[str] = None) -> slice:
         """
         Get the valid cross track indices
+
+        varpath (Optional[str]): full variable path. If given, use it to get the valid slice
         """
-        if self.is_l2_met or self.is_l3:
+        if self.is_l2_met or self.is_l3 or self.is_labels:
             return slice(None)
 
         if self.is_postproc:
