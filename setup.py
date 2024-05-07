@@ -41,8 +41,11 @@ extras = {
         "cartopy",
         "geoviews",
         "datashader",
-        "gcsfs",
     ],
+    "gcsfs": [
+        "fsspec",
+        "gcsfs",
+    ], 
 }
 
 setup(

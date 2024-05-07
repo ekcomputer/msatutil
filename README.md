@@ -12,6 +12,10 @@ To be able to run the [mair_geoviews](notebooks/mair_geoviews.ipynb) notebook us
 
 `pip install -e msatutil[notebooks]`
 
+For loading csvs from a GCS filepath:
+
+`pip install -e msatutil[gcsfs]`
+
 # msatutil
 
 ## msatutil.msat_dset
@@ -53,6 +57,10 @@ There is a **get_msat** function to generate a **msat_collection** from all the 
 
 Can be used to compare granules from two different **msat_collection** objects
 
+### msatutil.make_spatial_index
+
+From a csv of filespaths, generate ESRI shapefile and geojson showing data coverage for L2pp or L3 files. There is an option for simplifying the output polygons to create small files. Currently, this function is very slow for L2 files due to the overhead of loading and re-gridding.
+
 # Notebooks
 
 There are notebooks showing example usage of the msatutil programs:
@@ -62,6 +70,8 @@ There are notebooks showing example usage of the msatutil programs:
 [compare_heatmaps](notebooks/compare_heatmaps_example.ipynb)
 
 [mair_geoviews](notebooks/mair_geoviews.ipynb)
+
+[mair_spatial_index](notebooks/mair_spatial_index.ipynb)
 
 ### Running mair_geoviews.ipynb
 
@@ -129,6 +139,18 @@ When **in_path** is a direct path to a file, **mairl3html** can be given the **-
 generate static maps for all the files matching the mairls arguments.
 
 Calling **mairl3html** with a **.csv** file and the **--show** argument won't generate plots, it is the same as calling **mairls**
+
+**make_spatial_index** is a console entry point for creating geospatial files of data coverages from a list of cloud filepaths.
+
+It interfaces with [mair_geoviews.py](msatutil/mair_geoviews.py)
+
+Usage:
+
+`make_spatial_index.py -c gs://msat-dev-science-data/L2_pp.csv --working_dir . --load_from_chkpt FALSE --save_frequency 2 --out_path l2_test --l2_data`
+
+Check detailed usage info with
+
+`make_spatial_index.py -h`
 
 #### Other
 
