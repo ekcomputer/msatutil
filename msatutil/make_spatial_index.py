@@ -11,6 +11,7 @@ import geopandas as gpd
 from rasterio.features import shapes
 from shapely.geometry import MultiPolygon, shape
 from rasterio.transform import from_origin
+import fsspec
 
 ## Use pyogrio for reading/writing large shapefiles
 engine = 'pyogrio'
@@ -286,7 +287,13 @@ def save_geojson(catalogue_pth: str, working_dir: str, load_from_chkpt: bool = T
                     continue  # Skip if geometry is already present
 
             print(f"[{index}] {gs_pth.split('/mosaic/')[-1]}")
-            ds = msat_dset(gs_pth)
+
+            fs = fsspec.filesystem('gcs')
+            if fs.exists(gs_pth):
+                ds = msat_dset(gs_pth)
+            else:
+                print(f'GCS object no longer exists: {gs_pth}')
+                continue
             if l2_data:
                 geom = level2Netcdf2Geom(ds, decimal_rounding=decimal_rounding, simplify=simplify_tol)
             else:
@@ -329,7 +336,14 @@ def save_geojson(catalogue_pth: str, working_dir: str, load_from_chkpt: bool = T
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Calls validDataArea2Gdf and writes out as an ESRI shapefile (if no polygon simplification), or a geojson otherwise. Requires user to be authenticated to GCS in order to load cloud paths.")
+        description='Calls validDataArea2Gdf and writes out as an ESRI shapefile (if no polygon simplification), or a geojson otherwise. Requires user to be authenticated to GCS in order to load cloud paths.',
+        epilog='''
+        Examples:
+        L2pp: gs://msat-dev-science-data/L2_pp.csv;
+        L3 segments: gs://msat-dev-science-data/L3_segment.csv;
+        L3 mosaics: gs://msat-dev-science-data/L3_mosaics.csv
+        '''
+    )
 
     # Required arguments with shortcuts
     parser.add_argument("-c", "--catalogue_pth", type=str, required=True,
@@ -346,12 +360,12 @@ def main():
                         help="Intermediate saving frequency every 'n' files. High number disables it. Default: 50.")
     parser.add_argument("-o", "--out_path", type=str, default=None,
                         help="Output path for the file, with extensions replaced. Default: Basename of catalogue_pth.")
-    parser.add_argument("-d", "--l2_data", type=str, default=False,
+    parser.add_argument("-d", "--l2_data", action="store_true",
                         help="Whether filepaths are for L2 data.")
     parser.add_argument("-r", "--decimal_rounding", type=int, default=2,
                         help="Number of lat/long decimal places to use for binning L2 data. (ignored if l2_data is False)")
     parser.add_argument("-a", "--latest", action="store_true",
-                        help="Passes `latest=True` arg to mair_ls.py in order to only process the most recent versions")
+                        help="Only process the most recent product versions based on mair_ls.py")
     args = parser.parse_args()
 
     # Call the function with the parsed arguments
@@ -371,17 +385,17 @@ def main():
 if __name__ == '__main__':
     main()
 
-    # ## Testing in debugger for L2
+    ## Testing in debugger for L2
     # catalogue_pth = 'gs://msat-dev-science-data/L2_pp.csv'
     # load_from_chkpt = True
     # simplify_tol = 0.01
-    # working_dir = '~/msat_spatial_idx' #'/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  # 
-    # save_frequency = 3 # for testingload_from_chkpt=True
-    # out_path = None #'test_march_19'
-    # l2_data=True
+    # # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
+    # working_dir = '~/msat_spatial_idx'
+    # save_frequency = 3  # for testingload_from_chkpt=True
+    # out_path = 'test_may7'  # None #'test_march_19'
+    # l2_data = True
     # out_pth_shp, out_pth_geojson = save_geojson(
-    
-    # catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data)
+    #     catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data)
     # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
 
     # ## Testing in debugger for L3_segments
@@ -395,6 +409,19 @@ if __name__ == '__main__':
     # l2_data = False
     # latest = False  # True
     # out_pth_shp, out_pth_geojson = save_geojson(
+    #     catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
+    # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
 
+    # # ## Testing in debugger for L3_mosaics
+    # catalogue_pth = 'gs://msat-dev-science-data/L3_mosaics.csv'
+    # load_from_chkpt = False
+    # simplify_tol = 0.001
+    # # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
+    # working_dir = '/Volumes/metis/MAIR/Spatial_catalogue'  # '~/msat_spatial_idx'
+    # save_frequency = 3  # for testingload_from_chkpt=True
+    # out_path = 'test_may7'
+    # l2_data = False
+    # latest = False  # True
+    # out_pth_shp, out_pth_geojson = save_geojson(
     #     catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
     # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
