@@ -132,7 +132,6 @@ def level2Netcdf2Geom(ds, decimal_rounding=2, simplify=None):
     if len(outline) == 0:  # empty bc no data at all
         return None
     else:
-        # clunky, can try with outline.__geo_interface__ instead
         multipolygon = outline['geometry'].values[0]
         if simplify is not None:
             multipolygon = simplifyWithCatch(multipolygon, simplify)
@@ -194,14 +193,9 @@ def validDataArea2Geom(ds, simplify=None):
 
 
 def load_catalogue_csv(df_pth, latest=False) -> pd.DataFrame:
-    # storage_options={'token': 'cloud'}
     df = pd.read_csv(df_pth)
     if latest == False:
         return df
-    # if loaded from ESRI shapefile with max field length of 10
-    # if isinstance(df, gpd.GeoDataFrame):
-    #     flight_name_key = 'flight_nam'
-    # else:
     flight_name_key = 'flight_name'
     unq_flights = np.unique(df[flight_name_key])
     latest_segments_concat = []  # init
@@ -384,44 +378,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-    ## Testing in debugger for L2
-    # catalogue_pth = 'gs://msat-dev-science-data/L2_pp.csv'
-    # load_from_chkpt = True
-    # simplify_tol = 0.01
-    # # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
-    # working_dir = '~/msat_spatial_idx'
-    # save_frequency = 3  # for testingload_from_chkpt=True
-    # out_path = 'test_may7'  # None #'test_march_19'
-    # l2_data = True
-    # out_pth_shp, out_pth_geojson = save_geojson(
-    #     catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data)
-    # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
-
-    # ## Testing in debugger for L3_segments
-    # catalogue_pth = 'gs://msat-dev-science-data/L3_segment.csv'
-    # load_from_chkpt = False
-    # simplify_tol = 0.001
-    # # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
-    # working_dir = '/Volumes/metis/MAIR/Spatial_catalogue'  # '~/msat_spatial_idx'
-    # save_frequency = 3  # for testingload_from_chkpt=True
-    # out_path = 'test_march_29'
-    # l2_data = False
-    # latest = False  # True
-    # out_pth_shp, out_pth_geojson = save_geojson(
-    #     catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
-    # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
-
-    # # ## Testing in debugger for L3_mosaics
-    # catalogue_pth = 'gs://msat-dev-science-data/L3_mosaics.csv'
-    # load_from_chkpt = False
-    # simplify_tol = 0.001
-    # # '/mnt/share1/mair_spatial_idx' # '/Volumes/metis/MAIR/Spatial_catalogue'  #
-    # working_dir = '/Volumes/metis/MAIR/Spatial_catalogue'  # '~/msat_spatial_idx'
-    # save_frequency = 3  # for testingload_from_chkpt=True
-    # out_path = 'test_may7'
-    # l2_data = False
-    # latest = False  # True
-    # out_pth_shp, out_pth_geojson = save_geojson(
-    #     catalogue_pth, working_dir, load_from_chkpt, simplify_tol, save_frequency, out_path, l2_data, latest=latest)
-    # print(f'File saved to {out_pth_shp} and {out_pth_geojson}')
