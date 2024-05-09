@@ -61,6 +61,16 @@ Can be used to compare granules from two different **msat_collection** objects
 
 From a csv of filespaths, generate ESRI shapefile and geojson showing data coverage for L2pp or L3 files. There is an option for simplifying the output polygons to create small files. Currently, this function is very slow for L2 files due to the overhead of loading and re-gridding.
 
+It interfaces with [mair_geoviews.py](msatutil/mair_geoviews.py)
+
+Usage:
+
+`make_spatial_index.py -c gs://msat-dev-science-data/L2_pp.csv --working_dir . --load_from_chkpt FALSE --save_frequency 2 --out_path l2_test --l2_data`
+
+Check detailed usage info with
+
+`make_spatial_index.py -h`
+
 # Notebooks
 
 There are notebooks showing example usage of the msatutil programs:
@@ -140,17 +150,6 @@ generate static maps for all the files matching the mairls arguments.
 
 Calling **mairl3html** with a **.csv** file and the **--show** argument won't generate plots, it is the same as calling **mairls**
 
-**make_spatial_index** is a console entry point for creating geospatial files of data coverages from a list of cloud filepaths.
-
-It interfaces with [mair_geoviews.py](msatutil/mair_geoviews.py)
-
-Usage:
-
-`make_spatial_index.py -c gs://msat-dev-science-data/L2_pp.csv --working_dir . --load_from_chkpt FALSE --save_frequency 2 --out_path l2_test --l2_data`
-
-Check detailed usage info with
-
-`make_spatial_index.py -h`
 
 #### Other
 
