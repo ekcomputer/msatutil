@@ -65,11 +65,11 @@ It interfaces with [mair_geoviews.py](msatutil/mair_geoviews.py)
 
 Usage:
 
-`make_spatial_index.py -c gs://msat-dev-science-data/L2_pp.csv --working_dir . --load_from_chkpt FALSE --save_frequency 2 --out_path l2_test --l2_data`
+`python make_spatial_index.py -c gs://msat-dev-science-data/L2_pp.csv --working_dir . --load_from_chkpt FALSE --save_frequency 2 --out_path l2_test --l2_data`
 
 Check detailed usage info with
 
-`make_spatial_index.py -h`
+`python make_spatial_index.py -h`
 
 # Notebooks
 
