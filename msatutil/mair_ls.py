@@ -23,7 +23,7 @@ def mair_ls(
     show: bool = True,
 ):
     with cloud_file(in_path) as csv_in:
-        df = pd.read_csv(csv_in)
+        df = pd.read_csv(csv_in, dtype={"time_start": str})
 
     for k in ["production_timestamp", "time_start", "time_end", "flight_date"]:
         if (k is not None) and (k in df.columns):
@@ -33,7 +33,7 @@ def mair_ls(
     for k, v in {
         "flight_name": flight_name,
         "aggregation": aggregation,
-        "level3_resolution": resolution,
+        "resolution": resolution,
         "production_operation": production_operation,
         "production_environment": production_environment,
         "molecule": molecule,
@@ -180,11 +180,7 @@ def create_parser(**kwargs):
         default=None,
         help="L2_granret only, molecule name: CO2, H2O, or O2",
     )
-    parser.add_argument(
-        "--show",
-        action="store_true",
-        help="if given, print the matching list of files",
-    )
+
     return parser
 
 
@@ -195,6 +191,7 @@ def main():
         parents=[parent_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     args = parser.parse_args()
+    args.show = True
 
     mair_ls(**vars(args))
 
