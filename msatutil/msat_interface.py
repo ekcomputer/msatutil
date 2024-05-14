@@ -74,10 +74,10 @@ def filter_large_triangles(points: np.ndarray, tri: Optional[Delaunay] = None, c
     if tri is None:
         tri = Delaunay(points)
 
-    edge_lengths = np.zeros(tri.vertices.shape)
+    edge_lengths = np.zeros(tri.simplices.shape)
     seen = {}
     # loop over triangles
-    for i, vertex in enumerate(tri.vertices):
+    for i, vertex in enumerate(tri.simplices):
         # loop over edges
         for j in range(3):
             id0 = vertex[j]
