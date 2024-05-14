@@ -444,7 +444,7 @@ class msat_nc:
             xtrack_axis = var_dim_map["xtrack"]
             rad = self.nc_dset["Band1/Radiance"][:]
             rad = rad.transpose(atrack_axis, xtrack_axis, spec_axis)
-            valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 0)[0]
+            valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 1e8)[0]
         if len(valid_xtrack) == 0:
             print(self.nc_dset.filepath(), " has no valid xtrack")
             valid_xtrack_slice = slice(None)
