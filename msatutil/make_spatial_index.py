@@ -192,7 +192,7 @@ def validDataArea2Geom(ds, simplify=None):
     return multipolygon
 
 
-def load_catalogue_csv(df_pth, latest=False, resolution='30m') -> pd.DataFrame:
+def load_catalogue_csv(df_pth, latest=False, resolution='30m', type='mosaic') -> pd.DataFrame:
     # storage_options={'token': 'cloud'}
     df = pd.read_csv(df_pth)
     if latest == False:
@@ -202,7 +202,7 @@ def load_catalogue_csv(df_pth, latest=False, resolution='30m') -> pd.DataFrame:
     latest_segments_concat = []  # init
     for flight in unq_flights:
         latest_segments = mair_ls(
-            df_pth, flight_name=flight, show=False, latest=True, resolution=resolution)
+            df_pth, flight_name=flight, show=False, latest=True, resolution=resolution, type=type)
         latest_segments_concat.append(latest_segments)
     df_filtered = pd.concat(latest_segments_concat, ignore_index=True)
     assert len(df_filtered) <= len(df)
