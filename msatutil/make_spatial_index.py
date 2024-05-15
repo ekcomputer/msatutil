@@ -192,7 +192,10 @@ def validDataArea2Geom(ds, simplify=None):
     return multipolygon
 
 
-def load_catalogue_csv(df_pth, latest=False, resolution='30m', type='mosaic') -> pd.DataFrame:
+def load_catalogue_csv(df_pth, latest=False, resolution=None, type=None, uri=None, **kwargs) -> pd.DataFrame:
+    '''
+    kwargs passed to mair_ls
+    '''
     # storage_options={'token': 'cloud'}
     df = pd.read_csv(df_pth)
     if latest == False:
@@ -202,18 +205,30 @@ def load_catalogue_csv(df_pth, latest=False, resolution='30m', type='mosaic') ->
     latest_segments_concat = []  # init
     for flight in unq_flights:
         latest_segments = mair_ls(
-            df_pth, flight_name=flight, show=False, latest=True, resolution=resolution, type=type)
+            df_pth, flight_name=flight, show=False, latest=True, resolution=resolution, type=type, uri=uri, **kwargs)
         latest_segments_concat.append(latest_segments)
     df_filtered = pd.concat(latest_segments_concat, ignore_index=True)
     assert len(df_filtered) <= len(df)
     return df_filtered
 
 
-def save_geojson(catalogue_pth: str, working_dir: str, load_from_chkpt: bool = True, simplify_tol: float = None, save_frequency: int = 50, out_path: str = None, l2_data=False, decimal_rounding=2, latest=False) -> list[str]:
+def save_geojson(catalogue_pth: str,
+                 working_dir: str,
+                 load_from_chkpt: bool = True,
+                 simplify_tol: float = None,
+                 save_frequency: int = 50,
+                 out_path: str = None,
+                 l2_data=False,
+                 decimal_rounding=2,
+                 latest=False,
+                 resolution='30m',
+                 type='mosaic',
+                 uri=None,
+                 **kwargs) -> list[str]:
     '''
     save_geojson Calls validDataArea2Gdf and writes out as an ESRI shapefile and a geojson (if polygon simplification is used).
 
-    Requires user to be authenticated to GCS in order to load cloud paths.
+    Requires user to be authenticated to GCS in order to load cloud paths. kwargs are passed to mair_ls.
 
     Parameters
     ----------
@@ -236,7 +251,12 @@ def save_geojson(catalogue_pth: str, working_dir: str, load_from_chkpt: bool = T
         Number of lat/long decimal places to use for binning L2 data. Default is 2 (ignored if l2_data is False).
     latest : bool, optional (False)
         If true, passes `latest=True` arg to mair_ls.py in order to only process the most recent versions
-
+    resolution : str, optional ('30m')
+        Ignored unless latest == True (arg for mair_ls). File resolution to filter for (30m or 10m).
+    type : str, optional ('mosaic')
+        Ignored unless latest == True (arg for mair_ls). File data type (mosaic or regrid)
+    uri : str, optional
+        Pattern to look for in the google storage path
     Returns
     -------
     list[str]
@@ -270,7 +290,8 @@ def save_geojson(catalogue_pth: str, working_dir: str, load_from_chkpt: bool = T
             # Assumes if loading from .shp, data is already filtered for latest, if desired
             df = gpd.read_file(catalogue_shp_out_pth, engine=engine)
         else:
-            df = load_catalogue_csv(catalogue_pth, latest)
+            df = load_catalogue_csv(
+                catalogue_pth, latest, resolution=resolution, type=type, uri=uri, **kwargs)
 
         ## Loop
         for index, row in df.iterrows():
@@ -347,8 +368,8 @@ def main():
                         help="Output directory to save the final spatial file.")
 
     # Optional arguments with shortcuts
-    parser.add_argument("-l", "--no-load_from_chkpt", action="store_false",
-                        help="Load from an existing output or from the catalogue path. Default: True.")
+    parser.add_argument("-l", "--no-load_from_chkpt", action="store_true",
+                        help="Don't load from an existing output or from the catalogue path. Default: False (loads from checkpoint).")
     parser.add_argument("-s", "--simplify_tol", type=float, default=None,
                         help="Polygon simplification tolerance in map units to reduce file size and rendering times. For L2 data, suggest setting to a value > 10**(-{decimal_rounding}). Default: None.")
     parser.add_argument("-f", "--save_frequency", type=int, default=50,
@@ -361,19 +382,28 @@ def main():
                         help="Number of lat/long decimal places to use for binning L2 data. (ignored if l2_data is False)")
     parser.add_argument("-a", "--latest", action="store_true",
                         help="Only process the most recent product versions based on mair_ls.py")
+    parser.add_argument("-e", "--resolution", type=str, default='30m',
+                        help="Ignored unless latest == True (arg for mair_ls). File resolution to filter for (30m or 10m).")
+    parser.add_argument("-t", "--type", type=str, default='mosaic',
+                        help="Ignored unless latest == True (arg for mair_ls). File data type (mosaic or regrid)")
+    parser.add_argument("-u", "--uri", type=str, default=None,
+                        help="Pattern to look for in the google storage path")
     args = parser.parse_args()
 
     # Call the function with the parsed arguments
     save_geojson(
         catalogue_pth=args.catalogue_pth,
         working_dir=args.working_dir,
-        load_from_chkpt=args.load_from_chkpt,
+        load_from_chkpt=~args.no_load_from_chkpt,
         simplify_tol=args.simplify_tol,
         save_frequency=args.save_frequency,
         out_path=args.out_path,
         l2_data=args.l2_data,
         decimal_rounding=args.decimal_rounding,
         latest=args.latest,
+        resolution=args.resolution,
+        type=args.type,
+        uri=args.uri,
     )
 
 
