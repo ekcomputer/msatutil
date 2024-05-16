@@ -290,10 +290,13 @@ def save_geojson(catalogue_pth: str,
             # Assumes if loading from .shp, data is already filtered for latest, if desired
             df = gpd.read_file(catalogue_shp_out_pth, engine=engine)
         else:
+            print('Computing latest version for each flight product...\n')
             df = load_catalogue_csv(
                 catalogue_pth, latest, resolution=resolution, type=type, uri=uri, **kwargs)
-
+            print(df)
+            print('\n')
         ## Loop
+        nrows = len(df)
         for index, row in df.iterrows():
             gs_pth = row['uri']
             if 'geometry' in df.columns:  # loaded from checkpoint
@@ -302,7 +305,7 @@ def save_geojson(catalogue_pth: str,
                         f"Geometry exists for {gs_pth.split('/mosaic/')[-1]}")
                     continue  # Skip if geometry is already present
 
-            print(f"[{index}] {gs_pth}")
+            print(f"[{index} / {nrows}] {gs_pth}")
 
             fs = fsspec.filesystem('gcs')
             if fs.exists(gs_pth):
@@ -394,7 +397,7 @@ def main():
     save_geojson(
         catalogue_pth=args.catalogue_pth,
         working_dir=args.working_dir,
-        load_from_chkpt=~args.no_load_from_chkpt,
+        load_from_chkpt=not args.no_load_from_chkpt,
         simplify_tol=args.simplify_tol,
         save_frequency=args.save_frequency,
         out_path=args.out_path,
