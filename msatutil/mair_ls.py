@@ -23,7 +23,7 @@ def mair_ls(
     show: bool = True,
 ):
     with cloud_file(in_path) as csv_in:
-        df = pd.read_csv(csv_in)
+        df = pd.read_csv(csv_in, dtype={"time_start": str})
 
     for k in ["production_timestamp", "time_start", "time_end", "flight_date"]:
         if (k is not None) and (k in df.columns):
@@ -33,7 +33,7 @@ def mair_ls(
     for k, v in {
         "flight_name": flight_name,
         "aggregation": aggregation,
-        "level3_resolution": resolution,
+        "resolution": resolution,
         "production_operation": production_operation,
         "production_environment": production_environment,
         "molecule": molecule,
@@ -50,13 +50,24 @@ def mair_ls(
     if (flight_date is not None) and ("flight_date" in df.columns):
         df = df.loc[df["flight_date"] == pd.to_datetime(flight_date)]
 
+    if df.index.size == 0:
+        return df.reset_index().drop(columns=["index"])
+
+    if latest and "production_timestamp" in df.columns:
+        sorted_production_operation = list(
+            df.sort_values(by="production_timestamp")
+            .groupby("production_operation")
+            .first()
+            .sort_values(by="production_timestamp")
+            .reset_index()["production_operation"]
+        )
+        production_operation = sorted_production_operation[-1]
+        df = df.loc[df["production_operation"] == production_operation]
+
     if timestamp is not None:
         timestamp = pd.to_datetime(timestamp)
 
-    if latest and "production_timestamp" in df.columns:
-        timestamp = df["production_timestamp"].max()
-
-    if ((timestamp is not None) or latest) and "production_timestamp" in df.columns:
+    if timestamp is not None and "production_timestamp" in df.columns:
         df = df.loc[df["production_timestamp"] == timestamp]
 
     time_filter_pattern = r"([<>]=?|[=!]=)\s*(.*)"
@@ -83,7 +94,7 @@ def mair_ls(
         for i in df.uri.tolist():
             print(i)
 
-    return df
+    return df.reset_index().drop(columns=["index"])
 
 
 def create_parser(**kwargs):
@@ -169,11 +180,7 @@ def create_parser(**kwargs):
         default=None,
         help="L2_granret only, molecule name: CO2, H2O, or O2",
     )
-    parser.add_argument(
-        "--show",
-        action="store_true",
-        help="if given, print the matching list of files",
-    )
+
     return parser
 
 
@@ -184,6 +191,7 @@ def main():
         parents=[parent_parser], formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     args = parser.parse_args()
+    args.show = True
 
     mair_ls(**vars(args))
 

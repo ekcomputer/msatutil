@@ -132,7 +132,6 @@ def level2Netcdf2Geom(ds, decimal_rounding=2, simplify=None):
     if len(outline) == 0:  # empty bc no data at all
         return None
     else:
-        # clunky, can try with outline.__geo_interface__ instead
         multipolygon = outline['geometry'].values[0]
         if simplify is not None:
             multipolygon = simplifyWithCatch(multipolygon, simplify)
@@ -194,14 +193,9 @@ def validDataArea2Geom(ds, simplify=None):
 
 
 def load_catalogue_csv(df_pth, latest=False) -> pd.DataFrame:
-    # storage_options={'token': 'cloud'}
     df = pd.read_csv(df_pth)
     if latest == False:
         return df
-    # if loaded from ESRI shapefile with max field length of 10
-    # if isinstance(df, gpd.GeoDataFrame):
-    #     flight_name_key = 'flight_nam'
-    # else:
     flight_name_key = 'flight_name'
     unq_flights = np.unique(df[flight_name_key])
     latest_segments_concat = []  # init

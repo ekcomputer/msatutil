@@ -36,10 +36,11 @@ class msat_nc:
         self.is_l3 = "Provenance" in self.nc_dset.groups and hasattr(
             self.nc_dset["Provenance"], "msat_level3"
         )
+        self.is_labels = "cloud_mask" in self.nc_dset.variables
         self.is_postproc = "product_co2proxy" in self.nc_dset.groups
         self.is_l2_met = "Surface_Band1" in self.nc_dset.groups
         self.is_l2 = not self.is_l2_met and (("Level1" in self.nc_dset.groups) or self.is_postproc)
-        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc, self.is_l3]
+        self.is_l1 = True not in [self.is_l2, self.is_l2_met, self.is_postproc, self.is_l3, self.is_labels]
         self.varpath_list = None
 
         # dictionary that maps all the dimensions names across L1/L2 file versions to a common set of names
@@ -116,6 +117,7 @@ class msat_nc:
     def __str__(self) -> str:
         return f"""msat_nc:
         use_dask: {self.use_dask}
+        is_labels: {self.is_labels}
         is_l1: {self.is_l1}
         is_l2: {self.is_l2}
         is_l3: {self.is_l3}
@@ -405,11 +407,13 @@ class msat_nc:
 
         return var_dim_map
 
-    def get_valid_xtrack(self) -> slice:
+    def get_valid_xtrack(self, varpath: Optional[str] = None) -> slice:
         """
         Get the valid cross track indices
+
+        varpath (Optional[str]): full variable path. If given, use it to get the valid slice
         """
-        if self.is_l2_met or self.is_l3:
+        if self.is_l2_met or self.is_l3 or self.is_labels:
             return slice(None)
 
         if self.is_postproc:
@@ -417,7 +421,15 @@ class msat_nc:
         elif self.is_l2:
             longitude_varpath = "Level1/Longitude"
 
-        if self.is_l2:
+        if varpath is not None:
+            var_dim_map = self.get_dim_map(varpath)
+            atrack_axis = var_dim_map["atrack"]
+            valid_xtrack = np.where(
+                ~np.isnan(
+                    np.nanmedian(self.nc_dset[varpath][:], axis=atrack_axis).squeeze()
+                )
+            )[0]            
+        elif self.is_l2:
             var_dim_map = self.get_dim_map(longitude_varpath)
             atrack_axis = var_dim_map["atrack"]
             valid_xtrack = np.where(
@@ -432,7 +444,7 @@ class msat_nc:
             xtrack_axis = var_dim_map["xtrack"]
             rad = self.nc_dset["Band1/Radiance"][:]
             rad = rad.transpose(atrack_axis, xtrack_axis, spec_axis)
-            valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 0)[0]
+            valid_xtrack = np.where(np.nanmedian(np.nansum(rad, axis=2), axis=0) > 1e8)[0]
         if len(valid_xtrack) == 0:
             print(self.nc_dset.filepath(), " has no valid xtrack")
             valid_xtrack_slice = slice(None)

@@ -74,10 +74,10 @@ def filter_large_triangles(points: np.ndarray, tri: Optional[Delaunay] = None, c
     if tri is None:
         tri = Delaunay(points)
 
-    edge_lengths = np.zeros(tri.vertices.shape)
+    edge_lengths = np.zeros(tri.simplices.shape)
     seen = {}
     # loop over triangles
-    for i, vertex in enumerate(tri.vertices):
+    for i, vertex in enumerate(tri.simplices):
         # loop over edges
         for j in range(3):
             id0 = vertex[j]
@@ -419,11 +419,11 @@ class msat_collection:
             self.start_dates = None
             self.end_dates = None
 
-    def get_valid_xtrack(self):
+    def get_valid_xtrack(self, varpath: Optional[str] = None):
         """
         Get the valid cross track indices
         """
-        return self.msat_files[self.ids[0]].get_valid_xtrack()
+        return self.msat_files[self.ids[0]].get_valid_xtrack(varpath)
 
     def get_valid_rad(self):
         """
@@ -716,6 +716,8 @@ class msat_collection:
             x[np.greater(x, 1e29)] = np.nan
 
         x_slices = [slice(None) for i in range(len(x.shape))]
+        original_ndim = len(x_slices)
+        reduced = False
         if option is not None:
             option_axis = var_dim_map[option_axis_dim]
             if self.use_dask:
@@ -723,11 +725,14 @@ class msat_collection:
             else:
                 x = getattr(np, option)(x, axis=option_axis)
             x_slices = [slice(None) for i in range(len(x.shape))]
+            reduced = len(x_slices) < original_ndim
         elif (extra_id is not None) and (extra_id_dim is not None):
             extra_id_dim_axis = var_dim_map[extra_id_dim]
             x_slices[extra_id_dim_axis] = extra_id
         if use_valid_xtrack and "xtrack" in var_dim_map:
             xtrack_dim_axis = var_dim_map["xtrack"]
+            if reduced and option_axis < xtrack_dim_axis:
+                xtrack_dim_axis -= 1
             x_slices[xtrack_dim_axis] = self.valid_xtrack
         x = x[tuple(x_slices)]
 
