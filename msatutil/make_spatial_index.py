@@ -192,7 +192,8 @@ def validDataArea2Geom(ds, simplify=None):
     return multipolygon
 
 
-def load_catalogue_csv(df_pth, latest=False) -> pd.DataFrame:
+def load_catalogue_csv(df_pth, latest=False, resolution='30m') -> pd.DataFrame:
+    # storage_options={'token': 'cloud'}
     df = pd.read_csv(df_pth)
     if latest == False:
         return df
@@ -201,7 +202,7 @@ def load_catalogue_csv(df_pth, latest=False) -> pd.DataFrame:
     latest_segments_concat = []  # init
     for flight in unq_flights:
         latest_segments = mair_ls(
-            df_pth, flight_name=flight, show=False, latest=True)
+            df_pth, flight_name=flight, show=False, latest=True, resolution=resolution)
         latest_segments_concat.append(latest_segments)
     df_filtered = pd.concat(latest_segments_concat, ignore_index=True)
     assert len(df_filtered) <= len(df)
@@ -280,7 +281,7 @@ def save_geojson(catalogue_pth: str, working_dir: str, load_from_chkpt: bool = T
                         f"Geometry exists for {gs_pth.split('/mosaic/')[-1]}")
                     continue  # Skip if geometry is already present
 
-            print(f"[{index}] {gs_pth.split('/mosaic/')[-1]}")
+            print(f"[{index}] {gs_pth}")
 
             fs = fsspec.filesystem('gcs')
             if fs.exists(gs_pth):
@@ -346,7 +347,7 @@ def main():
                         help="Output directory to save the final spatial file.")
 
     # Optional arguments with shortcuts
-    parser.add_argument("-l", "--load_from_chkpt", type=bool, default=True,
+    parser.add_argument("-l", "--no-load_from_chkpt", action="store_false",
                         help="Load from an existing output or from the catalogue path. Default: True.")
     parser.add_argument("-s", "--simplify_tol", type=float, default=None,
                         help="Polygon simplification tolerance in map units to reduce file size and rendering times. For L2 data, suggest setting to a value > 10**(-{decimal_rounding}). Default: None.")
