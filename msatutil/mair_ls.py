@@ -19,11 +19,12 @@ def mair_ls(
     time_start: Optional[str] = None,
     time_end: Optional[str] = None,
     molecule: Optional[str] = None,
+    type: Optional[str] = None,
     latest: bool = False,
     show: bool = True,
 ):
     with cloud_file(in_path) as csv_in:
-        df = pd.read_csv(csv_in, dtype={"time_start": str})
+        df = pd.read_csv(csv_in)
 
     for k in ["production_timestamp", "time_start", "time_end", "flight_date"]:
         if (k is not None) and (k in df.columns):
@@ -37,12 +38,13 @@ def mair_ls(
         "production_operation": production_operation,
         "production_environment": production_environment,
         "molecule": molecule,
+        "type": type,
     }.items():
         if (v is not None) and (k in df.columns):
             df = df.loc[df[k].str.lower() == v.lower()]
 
     # string contains checks
-    for k, v in {"level3_target_name": target_name, "uri": uri}.items():
+    for k, v in {"target": target_name, "uri": uri}.items():
         if (v is not None) and (k in df.columns):
             df = df.loc[df[k].str.contains(v, na=False, case=False)]
 
@@ -167,6 +169,12 @@ def create_parser(**kwargs):
         type=str,
         default=None,
         help="production environment e.g. prod or stag or dev",
+    )
+    parser.add_argument(
+        "--type",
+        type=str,
+        default=None,
+        help="product type e.g. mosaic or regrid",
     )
     parser.add_argument(
         "--latest",
