@@ -23,6 +23,7 @@ import panel as pn
 from msatutil.msat_dset import msat_dset, gs_list
 from msatutil.mair_ls import mair_ls
 from msatutil.mair_ls import create_parser as create_ls_parser
+from msatutil.msat_interface import get_msat
 
 from typing import Optional, Tuple, Union, List
 
@@ -44,7 +45,7 @@ def show_map(
     background_tile_list=[EsriImagery],
     single_panel: bool = False,
     pixel_ratio: int = 1,
-    active_tools=['pan', 'wheel_zoom'],
+    active_tools=["pan", "wheel_zoom"],
 ):
     """
     Make a geoviews map of z overlayed on background_tile
@@ -173,8 +174,15 @@ def save_static_plot_with_widgets(out_file: str, plot, alpha: float = 1.0, cmap:
     print(out_file)
 
 
+def split_var(var: str) -> tuple[Optional[str], str]:
+    grp = None
+    if "/" in var:
+        grp, var = var.split("/")
+    return grp, var
+
+
 def do_single_map(
-    data_file: str,
+    in_path: str,
     var: str,
     lon_var: str = "lon",
     lat_var: str = "lat",
@@ -192,9 +200,9 @@ def do_single_map(
     pixel_ratio: int = 1,
 ) -> None:
     """
-    Save a html plot of var from data_file
+    Save a html plot of var from in_path
 
-    data_file (str): full path to the input netcdf data file, can be a gs:// path
+    in_path (str): full path to the input netcdf data file, can be a gs:// path. OR full path to input directory
     var (str): variable name in the data file
     lon_var (str): name of the longitude variable
     lat_var (str): name of the latitude variable
@@ -212,7 +220,10 @@ def do_single_map(
     num_samples_threshold (Optional[float]): filter out data with num_samples<num_samples_threshold
     pixel_ratio (int): the initial map (and the static maps) will have width x height pixels, this multiplies the number of pixels
     """
-    default_html_filename = os.path.basename(data_file).replace(".nc", ".html")
+    if in_path.endswith(".nc"):
+        default_html_filename = os.path.basename(in_path).replace(".nc", ".html")
+    else:
+        default_html_filename = os.path.basename(in_path) + ".html"
     if out_path is None:
         out_file = os.path.join(os.getcwd(), default_html_filename)
     elif os.path.splitext(out_path)[1] == "":
@@ -224,13 +235,22 @@ def do_single_map(
             os.makedirs(os.path.dirname(out_path))
         out_file = out_path
 
-    with msat_dset(data_file) as nc:
-        lon = nc[lon_var][:]
-        lat = nc[lat_var][:]
-        v = nc[var][:]
-        if num_samples_threshold is not None:
-            num_samples = nc["num_samples"][:]
-            v[num_samples < num_samples_threshold] = np.nan
+    if in_path.endswith(".nc"):
+        with msat_dset(in_path) as nc:
+            lon = nc[lon_var][:]
+            lat = nc[lat_var][:]
+            v = nc[var][:]
+            if num_samples_threshold is not None:
+                num_samples = nc["num_samples"][:]
+                v[num_samples < num_samples_threshold] = np.nan
+    else:
+        with get_msat(in_path) as msat_data:
+            grp, lon_var = split_var(lon_var)
+            lon = msat_data.pmesh_prep(lon_var, grp=grp, use_valid_xtrack=True).compute()
+            grp, lat_var = split_var(lat_var)
+            lat = msat_data.pmesh_prep(lat_var, grp=grp, use_valid_xtrack=True).compute()
+            grp, var = split_var(var)
+            v = msat_data.pmesh_prep(var, grp=grp, use_valid_xtrack=True).compute()
 
     if background_tile_name_list is not None:
         tile_dict = {k.lower(): v for k, v in gv.tile_sources.__dict__["tile_sources"].items()}
@@ -408,6 +428,11 @@ def create_plot_parser(**kwargs):
     plot_parser.add_argument(
         "out_path",
         help="full path to the output directory",
+    )
+    plot_parser.add_argument(
+        "--use-get-msat",
+        action="store_true",
+        help="if given and in_path is a directory, use msat_interface.get_msat to read the data",
     )
     plot_parser.add_argument(
         "-o",
@@ -610,7 +635,7 @@ def main():
                 pixel_ratio=args.pixel_ratio,
             )
 
-    elif os.path.splitext(args.in_path)[1] != "":
+    elif os.path.splitext(args.in_path)[1] != "" or args.use_get_msat:
         # If in_path point directly to a L3 mosaic file
         do_single_map(
             args.in_path,
@@ -631,7 +656,7 @@ def main():
             pixel_ratio=args.pixel_ratio,
         )
     else:
-        # If in_path point to a directory
+        # If in_path points to a directory structured as expected by L3_mosaics_to_html
         L3_mosaics_to_html(
             args.in_path,
             args.out_path,
