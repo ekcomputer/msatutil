@@ -910,6 +910,8 @@ class msat_collection:
         grp: Optional[str] = None,
         sv_var: Optional[str] = None,
         vminmax: Optional[Annotated[Sequence[float], 2]] = None,
+        over: str = "red",
+        under: str = "hotpink",
         latlon: bool = False,
         ratio: bool = False,
         ylim: Optional[Annotated[Sequence[float], 2]] = None,
@@ -925,7 +927,7 @@ class msat_collection:
         n: Optional[int] = None,
         method: str = "cubic",
         save_nc: Optional[Annotated[Sequence[str], 2]] = None,
-        ax: plt.Axes = None,
+        ax: Optional[plt.Axes] = None,
         res: float = 20,
         scale: float = 1.0,
         cmap: str = "viridis",
@@ -934,27 +936,29 @@ class msat_collection:
     ) -> None:
         """
         Make a heatmap of the given variable
-        var: key contained in the variable to search (uses msat_nc fetch method)
-        grp: if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
-        vminmax: min and max value to be shown with the colorbar
-        latlon: if True, make the plot on latitude/longitude instead of xtrack/atrack
-        ratio: if True, plots the variable divided by its median
-        ylim: sets the vertical axis range (in cross track pixel indices)
-        extra_id: integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables and when "option" is None
-        extra_id_dim: name of the dimension along which extra_id will be selected
-        ratio: if True, return the variable divided by its median
-        option: can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std'), for example to plot a heatmap of the maximum radiance
-        option_axis_dim: the axis along which the stat is applied (from the set of common dimension names: ["xtrack","atrack","xtrack_edge","atrack_edge","lev","lev_edge","corner","spectral_channel","xmx","nsubx"])
-        chunks: when self.use_dask is True, sets the chunk size for dask arrays
-        lon_lim: [min,max] longitudes for the gridding
-        lat_lim: [min,max] latitudes for the gridding
-        n: number of files chunked together for the gridding
-        method: griddata interpolation method, only used if lon_lim and lat_lim are given
-        save_nc: [nc_file_path,varname] list containing the full path to the output L3 netcdf file and the name the variable will have in the file
-        ax: if given, make the plot in the given matplotlib axes object
-        res: the resolution (in meters) of the grid with lon_lim and lat_lim are given
-        scale: a factor with which the data will be scaled
-        cmap: matplotlib named colormaps (https://matplotlib.org/stable/gallery/color/colormap_reference.html)
+        var (str): key contained in the variable to search (uses msat_nc fetch method)
+        grp (Optional[str]): if givem use msat_nc.get_var instead of msat_nc.fetch and var must be the exact variable name
+        vminmax (Optional[Annotated[Sequence[float], 2]]): min and max value to be shown with the colorbar
+        over (str): color to use above the max of the color scale (only used if vminmax is not None)
+        under (str): color to use under the min of the color scale (only used if vminmax is not None)
+        latlon (bool): if True, make the plot on latitude/longitude instead of xtrack/atrack
+        ratio (bool): if True, plots the variable divided by its median
+        ylim (Optional[Annotated[Sequence[float], 2]]): sets the vertical axis range
+        extra_id (Optional[int]): integer to slice a third index (e.g. along wmx_1 for Radiance_I (wmx_1,jmx,imx)) only does something for 3D variables and when "option" is None
+        extra_id_dim (str): name of the dimension along which extra_id will be selected
+        ratio (bool): if True, return the variable divided by its median
+        option (Optional[str]): can be used to get stats from a 3d variable (any numpy method e.g. 'max' 'nanmax' 'std'), for example to plot a heatmap of the maximum radiance
+        option_axis_dim (str): the axis along which the stat is applied (from the set of common dimension names: ["xtrack","atrack","xtrack_edge","atrack_edge","lev","lev_edge","corner","spectral_channel","xmx","nsubx"])
+        chunks (Union[str, Tuple]): when self.use_dask is True, sets the chunk size for dask arrays
+        lon_lim (Optional[Annotated[Sequence[float], 2]]): [min,max] longitudes for the gridding
+        lat_lim (Optional[Annotated[Sequence[float], 2]]): [min,max] latitudes for the gridding
+        n (Optional[int]): number of files chunked together for the gridding
+        method (str): griddata interpolation method, only used if lon_lim and lat_lim are given
+        save_nc (Optional[Annotated[Sequence[str], 2]]): [nc_file_path,varname] list containing the full path to the output L3 netcdf file and the name the variable will have in the file
+        ax (Optional[plt.Axes]): if given, make the plot in the given matplotlib axes object, otherwise create a new one
+        res (float): the resolution (in meters) of the grid with lon_lim and lat_lim are given
+        scale (float): a factor with which the data will be scaled
+        cmap (str): matplotlib named colormaps (https://matplotlib.org/stable/gallery/color/colormap_reference.html)
         set_nan (Optional[float]): this value will be replaced with nan after a pmesh_prep call
         use_valid_xtrack (bool): if True, only gets the data along the self.valid_xtrack slice
         """
@@ -979,6 +983,10 @@ class msat_collection:
 
         if latlon and not use_valid_xtrack:
             use_valid_xtrack = True
+
+        if latlon and gridded:
+            print("Note: latlon does nothing when gridded is True")
+            latlon = False
 
         if not gridded:
             x = self.pmesh_prep(
@@ -1015,32 +1023,9 @@ class msat_collection:
                     chunks=chunks,
                     use_valid_xtrack=use_valid_xtrack,
                 )
-
-            if vminmax is None:
-                if latlon:
-                    m = ax.pcolormesh(
-                        lon,
-                        lat,
-                        x,
-                        cmap=cmap,
-                    )
-                else:
-                    m = ax.pcolormesh(x, cmap=cmap)
-            else:
-                if latlon:
-                    m = ax.pcolormesh(
-                        lon,
-                        lat,
-                        x,
-                        cmap=cmap,
-                        vmin=vminmax[0],
-                        vmax=vminmax[1],
-                    )
-                else:
-                    m = ax.pcolormesh(x, cmap=cmap, vmin=vminmax[0], vmax=vminmax[1])
             # end of if not gridded
         elif gridded:
-            lon_grid, lat_grid, gridded_x = self.grid_prep(
+            lon, lat, x = self.grid_prep(
                 var,
                 lon_lim,
                 lat_lim,
@@ -1058,36 +1043,45 @@ class msat_collection:
                 res=res,
                 set_nan=set_nan,
             )
-            gridded_x = gridded_x * scale
+            x = x * scale
 
             if save_nc:
                 with ncdf.Dataset(save_nc[0], "r+") as outfile:
                     if "atrack" not in save_nc.dimensions:
-                        outfile.createDimension("atrack", lat_grid.shape([0]))
+                        outfile.createDimension("atrack", lat.shape([0]))
                     if "xtrack" not in outfile.dimensions:
-                        outfile.createDimension("atrack", lat_grid.shape([1]))
+                        outfile.createDimension("atrack", lat.shape([1]))
                     if "latitude" not in outfile.variables:
-                        outfile.createVariable("latitude", lat_grid.shape, ("atrack", "xtrack"))
-                        outfile["latitude"][:] = lat_grid
+                        outfile.createVariable("latitude", lat.shape, ("atrack", "xtrack"))
+                        outfile["latitude"][:] = lat
                     if "longitude" not in outfile.variables:
-                        outfile.createVariable("longitude", lat_grid.shape, ("atrack", "xtrack"))
-                        outfile["longitude"][:] = lon_grid
+                        outfile.createVariable("longitude", lat.shape, ("atrack", "xtrack"))
+                        outfile["longitude"][:] = lon
                     if save_nc[1] not in outfile.variables:
-                        outfile.createVariable(save_nc[1], lat_grid.shape, ("atrack", "xtrack"))
-                    outfile[save_nc[1]] = gridded_x
-
-            if vminmax is None:
-                m = ax.pcolormesh(lon_grid, lat_grid, gridded_x, cmap=cmap)
-            else:
-                m = ax.pcolormesh(
-                    lon_grid,
-                    lat_grid,
-                    gridded_x,
-                    cmap=cmap,
-                    vmin=vminmax[0],
-                    vmax=vminmax[1],
-                )
+                        outfile.createVariable(save_nc[1], lat.shape, ("atrack", "xtrack"))
+                    outfile[save_nc[1]] = x
         # end of elif gridded
+
+        # make the plot with pcolormesh
+        if vminmax is None:
+            vmin = None
+            vmax = None
+        else:
+            vmin, vmax = vminmax
+
+        if latlon or gridded:
+            m = ax.pcolormesh(
+                lon,
+                lat,
+                x,
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+            )
+        else:
+            m = ax.pcolormesh(x, cmap=cmap, vmin=vmin, vmax=vmax)
+        m.cmap.set_over(over)
+        m.cmap.set_under(under)
 
         # General plot layout
         if var == "dp":
@@ -1105,7 +1099,10 @@ class msat_collection:
             lab = f"{option} {lab}"
 
         if len(plt.gcf().axes) == 1:
-            plt.colorbar(m, label=lab, ax=ax)
+            if vminmax is not None:
+                plt.colorbar(m, label=lab, ax=ax, extend="both")
+            else:
+                plt.colorbar(m, label=lab, ax=ax)
 
         if self.start_dates is not None:
             start_dates = sorted([self.start_dates[i] for i in ids])
