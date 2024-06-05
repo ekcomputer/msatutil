@@ -231,7 +231,7 @@ def do_single_map(
             os.makedirs(out_path)
         out_file = os.path.join(out_path, default_html_filename)
     else:
-        if not os.path.exists(os.path.dirname(out_path)):
+        if os.path.dirname(out_path) and not os.path.exists(os.path.dirname(out_path)):
             os.makedirs(os.path.dirname(out_path))
         out_file = out_path
 
