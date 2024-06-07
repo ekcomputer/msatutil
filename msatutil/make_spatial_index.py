@@ -192,23 +192,52 @@ def validDataArea2Geom(ds, simplify=None):
     return multipolygon
 
 
-def load_catalogue_csv(df_pth, latest=False, resolution=None, type=None, uri=None, **kwargs) -> pd.DataFrame:
+def mair_ls_serial(catalogue, latest=False, **kwargs) -> pd.DataFrame:
     '''
-    kwargs passed to mair_ls
+    Calls mair_ls in a loop over flight names, if latest==True. Otherwise, simply returns the unfiltered catalogue. Useful for specifying 
+    latest=True, when the latest version *for each flight* is desired. Function runs slowly because it calls mair_ls dozens of times.
+
+    kwargs are passed to mair_ls. Don't specifiy `flight_name` or `show` in kwargs
+
+    Parameters
+    ----------
+    catalogue : str or pd.DataFrame
+        _description_
+    latest : bool, optional
+        Passes `latest=True` to mair_ls, by default False
+
+    Returns
+    -------
+    pd.DataFrame
+        Output of mair_ls
+
+    Raises
+    ------
+    TypeError
+        if catalogue is not str or pd.DataFrame
     '''
-    df = pd.read_csv(df_pth)
+    if isinstance(catalogue, str):
+        catalogue_pth = catalogue
+        catalogue = mair_ls(catalogue_pth, show=False,
+                            **kwargs)  # load from path
+    elif isinstance(catalogue, pd.DataFrame):
+        pass  # use pre-loaded catalogue
+    else:
+        raise TypeError(
+            "catalogue must be either a string representing a path or a pandas DataFrame")
     if latest == False:
-        return df
+        return catalogue
     flight_name_key = 'flight_name'
-    unq_flights = np.unique(df[flight_name_key])
+    unq_flights = np.unique(catalogue[flight_name_key])
     latest_segments_concat = []  # init
     for flight in unq_flights:
         latest_segments = mair_ls(
-            df_pth, flight_name=flight, show=False, latest=True, resolution=resolution, type=type, uri=uri, **kwargs)
+            catalogue_pth, flight_name=flight, show=False, latest=True, **kwargs)
         latest_segments_concat.append(latest_segments)
-    df_filtered = pd.concat(latest_segments_concat, ignore_index=True)
-    assert len(df_filtered) <= len(df)
-    return df_filtered
+    catalogue_filtered = pd.concat(latest_segments_concat, ignore_index=True)
+    assert len(catalogue_filtered) <= len(
+        catalogue), "The catalogue appears not to be filtered. Did you specify any keyword arguments?"
+    return catalogue_filtered
 
 
 def save_geojson(catalogue_pth: str,
@@ -290,7 +319,7 @@ def save_geojson(catalogue_pth: str,
             df = gpd.read_file(catalogue_shp_out_pth, engine=engine)
         else:
             print('Computing latest version for each flight product...\n')
-            df = load_catalogue_csv(
+            df = mair_ls_serial(
                 catalogue_pth, latest, resolution=resolution, type=type, uri=uri, **kwargs)
             print(df)
             print('\n')
@@ -358,8 +387,7 @@ def main():
         epilog='''
         Examples:
         L2pp: gs://msat-dev-science-data/L2_pp.csv;
-        L3 segments: gs://msat-dev-science-data/L3_segment.csv;
-        L3 mosaics: gs://msat-dev-science-data/L3_mosaics.csv
+        L3 segments/mosaics: gs://msat-dev-science-data/L3.csv;
         '''
     )
 
