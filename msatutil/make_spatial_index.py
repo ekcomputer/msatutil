@@ -3,10 +3,9 @@ import os
 import argparse
 import traceback
 from msatutil.msat_dset import msat_dset
-from msatutil.mair_ls import mair_ls
+from msatutil.mair_ls import mair_ls_serial
 import numpy as np
 import pandas as pd
-import xarray as xr
 import geopandas as gpd
 from rasterio.features import shapes
 from shapely.geometry import MultiPolygon, shape
@@ -192,54 +191,6 @@ def validDataArea2Geom(ds, simplify=None):
     return multipolygon
 
 
-def mair_ls_serial(catalogue, latest=False, **kwargs) -> pd.DataFrame:
-    '''
-    Calls mair_ls in a loop over flight names, if latest==True. Otherwise, simply returns the unfiltered catalogue. Useful for specifying 
-    latest=True, when the latest version *for each flight* is desired. Function runs slowly because it calls mair_ls dozens of times.
-
-    kwargs are passed to mair_ls. Don't specifiy `flight_name` or `show` in kwargs
-
-    Parameters
-    ----------
-    catalogue : str or pd.DataFrame
-        _description_
-    latest : bool, optional
-        Passes `latest=True` to mair_ls, by default False
-
-    Returns
-    -------
-    pd.DataFrame
-        Output of mair_ls
-
-    Raises
-    ------
-    TypeError
-        if catalogue is not str or pd.DataFrame
-    '''
-    if isinstance(catalogue, str):
-        catalogue_pth = catalogue
-        catalogue = mair_ls(catalogue_pth, show=False,
-                            **kwargs)  # load from path
-    elif isinstance(catalogue, pd.DataFrame):
-        pass  # use pre-loaded catalogue
-    else:
-        raise TypeError(
-            "catalogue must be either a string representing a path or a pandas DataFrame")
-    if latest == False:
-        return catalogue
-    flight_name_key = 'flight_name'
-    unq_flights = np.unique(catalogue[flight_name_key])
-    latest_segments_concat = []  # init
-    for flight in unq_flights:
-        latest_segments = mair_ls(
-            catalogue_pth, flight_name=flight, show=False, latest=True, **kwargs)
-        latest_segments_concat.append(latest_segments)
-    catalogue_filtered = pd.concat(latest_segments_concat, ignore_index=True)
-    assert len(catalogue_filtered) <= len(
-        catalogue), "The catalogue appears not to be filtered. Did you specify any keyword arguments?"
-    return catalogue_filtered
-
-
 def save_geojson(catalogue_pth: str,
                  working_dir: str,
                  load_from_chkpt: bool = True,
@@ -385,10 +336,18 @@ def main():
     parser = argparse.ArgumentParser(
         description='Calls validDataArea2Gdf and writes out as an ESRI shapefile (if no polygon simplification), or a geojson otherwise. Requires user to be authenticated to GCS in order to load cloud paths.',
         epilog='''
-        Examples:
-        L2pp: gs://msat-dev-science-data/L2_pp.csv;
-        L3 segments/mosaics: gs://msat-dev-science-data/L3.csv;
-        '''
+        Examples
+        --------
+        python msatutil/make_spatial_index.py -c gs://msat-dev-science-data/L3.csv -w /tmp -s 0.003 -a -t mosaic
+        python msatutil/make_spatial_index.py -c gs://msat-dev-science-data/L3.csv -w /tmp -s 0.003 -a -t regrid -e 30m -u priority-target
+        
+        Dataset paths:
+        --------
+        L2pp: gs://msat-dev-science-data/L2_pp.csv
+        L3 segments/mosaics: gs://msat-dev-science-data/L3.csv
+
+        ''',
+        formatter_class=argparse.RawTextHelpFormatter
     )
 
     # Required arguments with shortcuts
